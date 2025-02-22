@@ -4,6 +4,7 @@
 #include <limits>
 #include <tuple>
 
+
 double lerp(double A, double B, double t) {
     return A + (B - A) * t;
 }
@@ -28,7 +29,7 @@ std::optional<Intersection> getIntersection(const Point& A, const Point& B, cons
 }
 
 bool polysIntersect(const std::vector<Point>& poly1, const std::vector<Point>& poly2) {
-    // Lambda para projetar um polígono em uma direção (normal)
+
     auto projectPolygon = [](const std::vector<Point>& poly, const Point& normal) -> std::pair<double, double> {
         double minProj = std::numeric_limits<double>::infinity();
         double maxProj = -std::numeric_limits<double>::infinity();
@@ -40,7 +41,6 @@ bool polysIntersect(const std::vector<Point>& poly1, const std::vector<Point>& p
         return {minProj, maxProj};
     };
 
-    // Para cada aresta dos polígonos, verifica se existe um eixo separador.
     for (int polyIndex = 0; polyIndex < 2; ++polyIndex) {
         const std::vector<Point>& poly = (polyIndex == 0) ? poly1 : poly2;
         for (size_t i1 = 0; i1 < poly.size(); i1++) {
