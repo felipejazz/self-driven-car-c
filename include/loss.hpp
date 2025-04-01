@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cmath>
 
-// Classe base Loss
 class Loss {
 public:
     virtual ~Loss() = default;

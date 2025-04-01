@@ -1,27 +1,42 @@
-#ifndef GAME_HPP
-#define GAME_HPP
-
-#include <SFML/Graphics.hpp>
+#pragma once
+#include <SFML/Window/Keyboard.hpp>
+#include "road.hpp"
 #include "car.hpp"
 
 class Game {
 public:
-    unsigned int windowWidth;
-    unsigned int windowHeight;
-    unsigned int windowScale;
+    // Construtores
+    Game(int numCars);                     
+    Game(int numCars, ControlType cType); 
 
-    sf::RenderWindow window;
+    ~Game();
 
-    Game();
     void run();
-    void update();
-    void render();
-    void handleEvents();
-    void clean();
-    bool running();
 
 private:
-    Car car; 
-};
+    bool running();
+    void handleEvents();
+    void populate();
+    void createCar(int xPos, int yPos, ControlType cType);
+    int getLaneAvailable();
+    void update(float deltaTime);
+    void render();
+    void clean();
+    void resetGame();
+    void spawnTraffic(float deltaTime);
+    void updateTraffic(float deltaTime);
 
-#endif // GAME_HPP
+private:
+    sf::RenderWindow window;
+    Road road;
+
+    std::vector<Car*> cars; 
+    int numCars;
+
+    ControlType mainCarType;
+    unsigned int windowWidth;
+    unsigned int windowHeight;
+    float windowScale;
+    float spawnTimer     = 0.f;
+    float spawnInterval  = 1.f;
+};
