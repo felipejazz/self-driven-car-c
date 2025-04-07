@@ -1,7 +1,8 @@
 #include "game.hpp"
 #include "util.hpp"
 #include <iostream>
-
+#include "random"
+using namespace std;
 
 Game::Game(int numCars,ControlType cType)
     : numCars(numCars),
@@ -117,6 +118,7 @@ void Game::populate() {
 }
 
 void Game::createCar(int xPos, int yPos, ControlType ctype) {
+    std::cout << "Creating:car: "<< xPos << "," << yPos << std::endl;
     Car* newCar = new Car(xPos, yPos, ctype);
     cars.push_back(newCar);
 }
@@ -125,7 +127,7 @@ void Game::update(float deltaTime) {
     for (auto &car : cars) {
         bool hitBoundary = (car->getControlType() != ControlType::DUMMY) 
                            && !road.isWithinRoad(*car);
-    
+        
         car->updateMovement(deltaTime, road.getFriction(), hitBoundary);
     }
     for (auto &car : cars) {
@@ -135,10 +137,14 @@ void Game::update(float deltaTime) {
     for (size_t i = 0; i < cars.size(); ++i) {
         for (size_t j = i + 1; j < cars.size(); ++j) {
             if (polysIntersect(cars[i]->getPolygon(), cars[j]->getPolygon())) {
-                cars[i]->stop();
-                cars[i]->setDamage();
-                cars[j]->stop();
-                cars[j]->setDamage();
+                if (cars[i]->getControlType() != ControlType::DUMMY) {
+                    cars[i]->stop();
+                    cars[i]->setDamage();
+                    cars[j]->stop();
+                    cars[j]->setDamage();
+                    cout << "Car is not within a road" << endl;
+                }
+
             }
         }
     }
@@ -149,69 +155,55 @@ void Game::update(float deltaTime) {
     }
     road.update(deltaTime, playerSpeed);
 
-    spawnTraffic(deltaTime);
-
     updateTraffic(deltaTime);
 }
 
 
-void Game::spawnTraffic(float deltaTime) {
-    spawnTimer += deltaTime;
-    if (spawnTimer >= spawnInterval) {
-        spawnTimer = 0.f;
-
-        if (!cars.empty()) {
-            float mainCarY = cars[0]->getY();
-            int lane = getLaneAvailable();
-            float sx = road.getLaneCenter(lane);
-            float sy = mainCarY - 850.f;
-
-            bool canSpawn = true;
-            for (auto &c : cars) {
-                if (std::fabs(c->getY() - sy) < 120.f &&
-                    std::fabs(c->getX() - sx) < 50.f) {
-                    canSpawn = false;
-                    break;
-                }
-            }
-            if (canSpawn) {
-                createCar(static_cast<int>(sx), static_cast<int>(sy), ControlType::DUMMY);
-            }
-        }
-    }
-}
-
 void Game::updateTraffic(float deltaTime)
 {
-    const int DESIRED_CARS = 30;
+    // Quantos carros queremos manter
+    const int DESIRED_CARS = 10;
 
-
-    if (cars.empty()) return;
+    if (cars.empty()) {
+        return;
+    }
 
     Car* mainCar = cars[0];
     float mainCarY = mainCar->getY();
 
-    float removeThreshold = 1500.0f;
+    // Distância vertical acima do mainCar para remover "carros velhos"
+    float removeThreshold = 1000.0f;
 
-    for (size_t i = 1; i < cars.size();)
+    // REMOVE carros que estão 1500 px acima do mainCar
+    for (size_t i = 1; i < cars.size(); /* sem i++ aqui */)
     {
         Car* c = cars[i];
-        if (c->getY() > mainCarY + removeThreshold)
-        {
+        if (c->getY() < (mainCarY - removeThreshold)) {
+            std::cout<< "Removing Car" << std::endl;
             delete c;
             cars.erase(cars.begin() + i);
-        }
-        else {
+        } else {
             i++;
         }
     }
 
-    while (static_cast<int>(cars.size()) < DESIRED_CARS)
+    // Se ainda temos menos que 30 carros, criamos 1 DUMMY
+    if (static_cast<int>(cars.size()) < DESIRED_CARS)
     {
         int lane = getLaneAvailable();
         float spawnX = road.getLaneCenter(lane);
 
-        float spawnY = mainCarY - 1000.0f; 
+        // Define a faixa aleatória de spawn 
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        // ex: entre (mainCarY - 1500) e (mainCarY - 50)
+        // Ex: entre mainCarY - 3000 e mainCarY - 2000:
+        std::uniform_real_distribution<float> dist((mainCarY - 1500.f),
+                                                (mainCarY - 1000.f));
+
+
+        float spawnY = dist(gen);
+
         createCar(static_cast<int>(spawnX), static_cast<int>(spawnY), ControlType::DUMMY);
     }
 }

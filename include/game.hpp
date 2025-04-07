@@ -23,7 +23,6 @@ private:
     void render();
     void clean();
     void resetGame();
-    void spawnTraffic(float deltaTime);
     void updateTraffic(float deltaTime);
 
 private:

@@ -3,6 +3,7 @@
 #include <SFML/Graphics.hpp>
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 Road::Road(float x, float width, int laneCount, float friction)
     : m_x(x),
@@ -82,6 +83,7 @@ bool Road::isWithinRoad(const Car& car) const {
         
         if (!insideHoriz || !insideVert) {
             return false;
+            std::cout << "Car is not within a road: " << std::endl;
         }
     }
     return true;
