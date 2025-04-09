@@ -46,7 +46,9 @@ public:
         const std::vector<std::vector<sf::Vector2f>>& roadBorders,
         const std::vector<Car*>& otherCars
     );
-
+    std::vector<sf::Vector2f>& getReadings() { return m_readings;}
+    float getRayCount() { return m_rayCount; }
+    float getRayLength() { return m_rayLength; }
     const std::vector<sf::Vector2f>& getPolygon() const;
     // Desenha o sensor (raios) no target
     void draw(sf::RenderTarget& target) const;

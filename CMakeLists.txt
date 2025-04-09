@@ -9,7 +9,9 @@ find_package(SFML 3 REQUIRED COMPONENTS Graphics Window System)
 
 # Diretórios de includes
 include_directories(${CMAKE_SOURCE_DIR}/include)
-include_directories(${CMAKE_SOURCE_DIR}/third_party/eigen)
+
+# Adicionar o diretório do Eigen instalado no sistema
+include_directories(/usr/include/eigen3)
 
 # Adiciona o diretório com o código-fonte
 add_subdirectory(src)

@@ -14,6 +14,7 @@ Sensor::Sensor(Car* car)
 {
 }
 
+// In sensor.cpp, make sure the update method properly sets m_readings
 void Sensor::update(
     const std::vector<std::vector<sf::Vector2f>>& roadBorders,
     const std::vector<Car*>& otherCars
@@ -22,12 +23,9 @@ void Sensor::update(
     m_readings.clear();
     m_readings.reserve(m_rays.size());
 
-    std::vector<std::vector<sf::Vector2f>> allEdges;
+    std::vector<std::vector<sf::Vector2f>> allEdges = roadBorders;
 
-    for(const auto& border : roadBorders){
-        allEdges.push_back(border);
-    }
-
+    // Add car polygons to edges
     for(const auto& carPtr : otherCars){
         if(carPtr == m_car) continue;
 
@@ -38,8 +36,7 @@ void Sensor::update(
             allEdges.push_back({p1, p2});
         }
     }
-    
-
+  
     for (const auto& ray : m_rays) {
         auto reading = getReading(ray, allEdges);
         m_readings.push_back(reading.value_or(sf::Vector2f(-1, -1)));

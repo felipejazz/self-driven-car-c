@@ -3,6 +3,7 @@
 #include <vector>
 #include "controls.hpp"
 #include "sensor.hpp"
+#include "neural_network.hpp"
 
 class Road;
 
@@ -24,6 +25,12 @@ private:
 
     Controls* m_controls;
     Sensor* m_sensor;
+    NeuralNetwork* m_brain;
+    float m_fitness;
+    float m_stuckTime;
+    float m_lastY;
+    float m_followingPenalty;
+    bool m_isBest;
 
     void move(Road* road);
     bool assessDamage(const std::vector<std::vector<sf::Vector2f>>& roadBorders);
@@ -58,9 +65,20 @@ public:
 
     void stop();
     void setDamage();
+    bool isDamaged() const { return m_damaged; }
     const std::vector<sf::Vector2f>& getPolygon() const;
     bool isAi()       const { return (m_controlType == ControlType::AI); }
     bool isDummy()    const { return (m_controlType == ControlType::DUMMY); }
     bool isKeyboard() const { return (m_controlType == ControlType::KEYS); }
+    void setBrain(NeuralNetwork* brain);
+    NeuralNetwork* getBrain() const { return m_brain; }
+    float getFitness() const { return m_fitness; }
+    void updateFitness();
+    void setIsBest(bool isBest) { m_isBest = isBest; }
+    bool isBest() const { return m_isBest; }
+    float getStuckTime() const { return m_stuckTime; }
+    void resetStuckTime() { m_stuckTime = 0.f; }
+    void checkIfStuck(float deltaTime);
+    void checkIfFollowing(const std::vector<Car*>& cars);
     friend class Sensor;
 };

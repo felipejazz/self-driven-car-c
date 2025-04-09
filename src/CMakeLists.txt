@@ -1,7 +1,6 @@
 
 add_library(self_driven_car_c
     layer.cpp
-    loss.cpp
     mathematics.cpp
     game.cpp
     car.cpp
@@ -9,6 +8,7 @@ add_library(self_driven_car_c
     sensor.cpp
     util.cpp
     controls.cpp
+    neural_network.cpp
 )
 
 add_executable(${PROJECT_NAME} ${CMAKE_SOURCE_DIR}/main.cpp)
