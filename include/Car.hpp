@@ -8,15 +8,20 @@
 #include <string>
 #include <memory>
 #include <optional>
+#include <cmath>
 
-#include "Controls.hpp"
-#include "Network.hpp"
-#include "Road.hpp"
-#include "Sensor.hpp"
-
+// --- Project Headers ---
+// Forward declarations first if needed, then includes
+class Sensor;
+class NeuralNetwork;
+class Road;
+#include "Controls.hpp" // Include full definition as Car HAS a Controls object
+#include "Network.hpp" 
+#include "Utils.hpp" // For lerp, getValueColor
+#include "Visualizer.hpp" // For Visualizer 
 class Car {
 public:
-    // --- Membros Públicos Existentes ---
+    // --- Public Members ---
     sf::Vector2f position;
     float width;
     float height;
@@ -39,43 +44,53 @@ public:
     sf::Color color;
     bool textureLoaded = false;
 
-    // --- Novo Status e Constantes ---
-    bool isFollowing = false;
-    // ****** AJUSTADO PARA TESTE ******
-    constexpr static int OSCILATION_START_THRESHOLD = 1;   // Nº de inversões para marcar como 'following' (Diminuído para 1)
-    constexpr static int FOLLOWING_DAMAGE_THRESHOLD = 1; // Nº de frames seguindo para danificar (ex: 3 seg a 60fps)
-    constexpr static float FOLLOWING_Y_PENALTY = 50.0f;   // Penalidade na posição Y para seleção do melhor carro
-    constexpr static float DISTANCE_CHANGE_THRESHOLD = 0.1f; // Limiar para detectar mudança de distância
+    // --- Constantes para Regras de Dano ---
+    constexpr static float AGGRESSIVE_DELTA_THRESHOLD = 3.0f;
+    constexpr static int AGGRESSIVE_DELTA_DURATION_THRESHOLD = 120; // 2 sec @ 60fps
+    constexpr static float STOPPED_SPEED_THRESHOLD = 0.1f;
+    constexpr static int STOPPED_DURATION_THRESHOLD = 120; // 2 sec @ 60fps
+    constexpr static int REVERSE_DURATION_THRESHOLD = 180; // 3 sec @ 60fps
 
-    // --- Construtor e Métodos Públicos ---
+    // --- Construtor & Public Methods ---
     Car(float x, float y, float w, float h, ControlType type = ControlType::AI, float maxSpd = 3.0f, sf::Color col = sf::Color::Blue);
+
     void loadTexture(const std::string& filename);
     void update(const std::vector<std::pair<sf::Vector2f, sf::Vector2f>>& roadBorders,
                 std::vector<Car*>& traffic);
     void draw(sf::RenderTarget& target, bool drawSensor = false);
     std::vector<sf::Vector2f> getPolygon() const;
+
+    // Accessors
     NeuralNetwork* getBrain() { return brain ? &(*brain) : nullptr; }
     const NeuralNetwork* getBrain() const { return brain ? &(*brain) : nullptr; }
-
-    // Função auxiliar pública para calcular a distância
     float calculateMinDistanceAhead(const std::vector<Car*>& traffic, Car** nearestCarOut = nullptr);
-
+    float getPreviousDistanceAhead() const { return previousDistanceAhead; }
+    int getAggressiveDeltaFrames() const { return aggressiveDeltaFrames; }
+    // --- NOVO GETTER PARA O SCORE ---
+    float getNetDistanceTraveled() const { return netDistanceTraveled; }
 
 private:
-    // --- Métodos Privados ---
+    // --- Private Methods ---
     void move();
     bool assessDamage(const std::vector<std::pair<sf::Vector2f, sf::Vector2f>>& roadBorders,
                       const std::vector<Car*>& traffic);
 
-    // --- Variáveis Privadas para Detecção ---
+    // --- Private State Variables ---
     float desiredAcceleration = 0.0f;
     float lastAppliedAcceleration = 0.0f;
     int lastTurnDirection = 0;
+    // Tracking para regras de dano
     float previousDistanceAhead = -1.0f;
-    int distanceChangeDirection = 0;
-    int lastDistanceChangeDirection = 0;
-    int directionFlipCounter = 0;
-    int followingDuration = 0; // Contador de frames no estado 'following'
+    int aggressiveDeltaFrames = 0;
+    int stoppedFrames = 0;
+    int reversingFrames = 0;
+    // --- NOVAS VARIÁVEIS PARA SCORE ---
+    float netDistanceTraveled = 0.0f; // Score acumulado
+    float previousYPosition;         // Posição Y no frame anterior
 };
+
+// Includes que dependem da definição completa de Car
+#include "Sensor.hpp"
+#include "Network.hpp"
 
 #endif // CAR_HPP
