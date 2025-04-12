@@ -4,6 +4,7 @@ Controls::Controls(ControlType t) : type(t) {
     if (type == ControlType::DUMMY) {
         forward = true;
     }
+    // brake já é inicializado como false por padrão
 }
 
 void Controls::update() {
@@ -12,6 +13,7 @@ void Controls::update() {
         reverse = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S);
         left = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A);
         right = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D);
+        brake = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space); // <-- ADICIONADO: Verifica a tecla Space
     }
-    // For AI and DUMMY types, the state is set elsewhere (AI in Car::update, DUMMY in constructor).
+    // Para AI e DUMMY, o estado é definido em outro lugar.
 }
