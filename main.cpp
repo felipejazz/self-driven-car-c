@@ -230,41 +230,7 @@ int main() {
              }
         }
         bestCar = currentBestCar;
-        if (bestCar) { // Verifica se temos um melhor carro válido
-            float minDistanceAhead = std::numeric_limits<float>::max();
-            Car* nearestTrafficCar = nullptr;
-
-            for (const auto& trafficCarPtr : traffic) { // Itera sobre unique_ptr no vetor traffic
-                 if (trafficCarPtr) { // Verifica se o ponteiro não é nulo
-                    Car* trafficCar = trafficCarPtr.get(); // Obtém o ponteiro bruto
-
-                    // Verifica se o carro de tráfego está À FRENTE do bestCar
-                    if (trafficCar->position.y < bestCar->position.y) {
-                        // Calcula a distância Euclidiana entre os carros
-                        float distance = std::hypot(
-                            bestCar->position.x - trafficCar->position.x,
-                            bestCar->position.y - trafficCar->position.y
-                        );
-
-                        // Atualiza se esta for a menor distância encontrada até agora
-                        if (distance < minDistanceAhead) {
-                            minDistanceAhead = distance;
-                            nearestTrafficCar = trafficCar; // Guarda referência ao carro mais próximo (opcional)
-                        }
-                    }
-                 }
-            }
-
-            // Loga a distância mínima encontrada (se algum carro foi encontrado à frente)
-            if (nearestTrafficCar) { // Se encontramos um carro de tráfego à frente
-                std::cout << "BestCar (Y:" << bestCar->position.y
-                          << ") - Dist to nearest traffic ahead (Y:" << nearestTrafficCar->position.y
-                          << "): " << minDistanceAhead << std::endl;
-            } else {
-                // std::cout << "BestCar (Y:" << bestCar->position.y
-                //           << ") - No traffic detected ahead." << std::endl; // Log opcional
-            }
-        }
+        
 
         // --- Desenho ---
         window.clear(sf::Color(100, 100, 100)); // Fundo cinza

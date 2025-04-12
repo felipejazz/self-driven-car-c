@@ -1,3 +1,5 @@
+// In include/Sensor.hpp
+
 #ifndef SENSOR_HPP
 #define SENSOR_HPP
 
@@ -8,10 +10,11 @@
 #include <SFML/Graphics/VertexArray.hpp>
 #include <SFML/Graphics/Color.hpp>
 #include "Utils.hpp" // For IntersectionData
+#include "Road.hpp"  // <<< INCLUA Road.hpp AQUI para definição completa
 
 // Forward declaration
 class Car;
-class Road;
+// class Road; // <<< REMOVA a declaração antecipada daqui
 
 class Sensor {
 public:
@@ -25,8 +28,10 @@ public:
 
     Sensor(const Car& attachedCar);
 
+    // O tipo do parâmetro roadBorders está correto, pois recebe os dados,
+    // não precisa chamar métodos do objeto Road aqui.
     void update(const std::vector<std::pair<sf::Vector2f, sf::Vector2f>>& roadBorders,
-                const std::vector<Car*>& traffic); // Pass traffic by pointer
+                const std::vector<Car*>& traffic);
 
     void draw(sf::RenderTarget& target);
 
