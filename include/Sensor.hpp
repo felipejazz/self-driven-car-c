@@ -19,8 +19,8 @@ class Car;
 class Sensor {
 public:
     const Car& car; // Reference to the car it's attached to
-    int rayCount = 5;
-    float rayLength = 150.0f;
+    int rayCount = 15;
+    float rayLength = 75.0f;
     float raySpread = M_PI / 2.0f; // Approx 90 degrees
 
     std::vector<std::pair<sf::Vector2f, sf::Vector2f>> rays;
