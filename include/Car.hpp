@@ -56,9 +56,9 @@ private:
      sf::Sprite sprite;
      bool textureLoaded;
 
+    void updateBasedOnControls(Controls controls);
 
     // --- Membros Privados (Lógica de IA e Estado) ---
-    int lastTurnDirection = 0;
     float desiredAcceleration = 0.0f;
     float lastAppliedAcceleration = 0.0f;
     float stoppedTimer = 0.0f;
@@ -86,7 +86,7 @@ private:
                              const std::vector<Obstacle*>& obstacles,
                              Obstacle*& hitObstacle); // Parâmetro de saída
 
-
+    float calculateDesiredAcceleration(std::vector<float> outputs);
     // --- Constantes de Comportamento Internas ---
     static constexpr float STOPPED_SPEED_THRESHOLD = 0.05f;
     static constexpr float STOPPED_TIME_THRESHOLD_SECONDS = 5.0f;

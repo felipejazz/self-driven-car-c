@@ -21,7 +21,7 @@ Car::Car(float x, float y, float w, float h, ControlType type, float maxSpd, sf:
       width(w), height(h), maxSpeed(maxSpd), acceleration(0.2f),
       brakePower(acceleration * 2.0f), friction(0.05f), controlType(type),
       controls(type), color(col), textureLoaded(false), sprite(texture),
-      lastTurnDirection(0), desiredAcceleration(0.0f), lastAppliedAcceleration(0.0f),
+      desiredAcceleration(0.0f), lastAppliedAcceleration(0.0f),
       stoppedTimer(0.0f), reversingTimer(0.0f),
       previousYPosition(y),
       currentFitness(0.0f),
@@ -81,16 +81,60 @@ void Car::resetForNewGeneration(float startY, const Road& road) {
     reversingTimer = 0.0f;
     desiredAcceleration = 0.0f;
     lastAppliedAcceleration = 0.0f;
-    lastTurnDirection = 0;
     stuckCheckTimer = 0.0f;
     stuckCheckStartY = startY;
     passedObstacleIDs.clear();
 }
 
-// --- Update ---
+
+float Car::calculateDesiredAcceleration(std::vector<float> output){
+    if (output[0] > 0.5f) { // Acelerar
+        return acceleration;
+    }
+    if (output[1] > 0.5f) { // Frear
+       return -acceleration;
+    }
+    return .0f; // Parar
+}
+
+void Car::updateBasedOnControls(Controls control) {
+    if (control.type == ControlType::KEYS) {
+        controls.update(); // Atualiza baseado no teclado
+        if(controls.forward) desiredAcceleration = acceleration;
+        if(controls.reverse) desiredAcceleration = -acceleration;
+        return;
+    }
+    else if (control.type == ControlType::DUMMY) {
+        controls.forward = true; // Sempre acelera
+        controls.reverse = false;
+        controls.left = false;
+        controls.right = false;
+        return;
+    }
+    if (control.type == ControlType::AI) {
+        std::vector<float> sensorOffsets(sensor->rayCount);
+        for (size_t i = 0; i < sensor->rayCount; ++i) {
+             sensorOffsets[i] = (i < sensor->readings.size() && sensor->readings[i])
+                                ? (1.0f - sensor->readings[i]->offset) : 0.0f;
+        }
+        std::vector<float> outputs = NeuralNetwork::feedForward(sensorOffsets, *brain);
+        if (outputs.size() == 4) {
+            float desiredAcceleration = calculateDesiredAcceleration(outputs);
+            controls.forward = desiredAcceleration > 0.0f; // Acelerar
+            controls.reverse = desiredAcceleration < 0.0f; // Frear
+            controls.left = (outputs[2] > 0.5f); // Virar esquerda
+            controls.right = (outputs[3] > 0.5f); // Virar direita
+            return;
+        }
+    }
+    return;
+}
+
+
 // --- Update ---
 void Car::update(const Road& road, const std::vector<Obstacle*>& obstacles, sf::Time deltaTime) {
     bool wasAlreadyDamaged = damaged; // Guarda o estado ANTES das checagens de status
+    
     if (wasAlreadyDamaged) {
         speed = 0; // Garante que carros já danificados não se movam
         return;    // Sai do update se já começou danificado
@@ -99,47 +143,7 @@ void Car::update(const Road& road, const std::vector<Obstacle*>& obstacles, sf::
     // 1. Update Sensor (se existir)
     if (sensor) { sensor->update(road.borders, obstacles); }
 
-    // 2. Determine Controls (AI, Keys, Dummy)
-    bool setControlsFromNN = false;
-    desiredAcceleration = 0.0f;
-
-    if (controlType == ControlType::KEYS) {
-         controls.update(); // Atualiza baseado no teclado
-        if(controls.forward) desiredAcceleration = acceleration;
-        if(controls.reverse) desiredAcceleration = -acceleration;
-    }
-    else if (useBrain && brain && sensor) { // Lógica AI
-        std::vector<float> sensorOffsets(sensor->rayCount);
-        for (size_t i = 0; i < sensor->rayCount; ++i) {
-             sensorOffsets[i] = (i < sensor->readings.size() && sensor->readings[i])
-                                ? (1.0f - sensor->readings[i]->offset) : 0.0f;
-        }
-        std::vector<float> outputs = NeuralNetwork::feedForward(sensorOffsets, *brain);
-        if (outputs.size() >= 4) {
-            // Ajuste os thresholds conforme necessário (ex: 0.6 para acelerar, 0.4 para frear/ré)
-            if (outputs[0] > 0.6f) desiredAcceleration = acceleration;      // Acelerar
-            else if (outputs[0] < 0.4f) desiredAcceleration = -acceleration; // Frear/Ré
-            else desiredAcceleration = 0.0f;                               // Neutro
-
-            controls.forward = (desiredAcceleration > 0.0f);
-            controls.reverse = (desiredAcceleration < 0.0f);
-            controls.left = (outputs[1] > 0.5f); // Virar esquerda
-            controls.right = (outputs[2] > 0.5f); // Virar direita
-            // outputs[3] (freio) não está sendo usado diretamente para 'desiredAcceleration' aqui, mas poderia ser
-            setControlsFromNN = true;
-        } else {
-            std::cerr << "Error: Brain output size mismatch!" << std::endl;
-             // Fallback: não fazer nada ou usar comportamento padrão
-             controls.forward = false; controls.reverse = false; controls.left = false; controls.right = false;
-        }
-    }
-    else if (controlType == ControlType::DUMMY) { // Lógica Dummy
-        controls.forward = true; controls.reverse = false; controls.left = false; controls.right = false;
-        desiredAcceleration = acceleration;
-    }
-
-    // 3. Anti-Pendulum (Opcional - não implementado)
-    // ...
+    updateBasedOnControls(controls); // Atualiza controles
 
     // 4. Move Car
     move(0.0f, deltaTime); // O parâmetro aiBrakeSignal não está sendo usado aqui
@@ -237,15 +241,28 @@ void Car::checkStuckStatus(sf::Time deltaTime) {
     }
 }
 // --- move ---
-void Car::move(float aiBrakeSignal, sf::Time deltaTime) {
+void Car::move(float aiBrakeSignal, sf::Time deltaTime) { // aiBrakeSignal não parece ser usado aqui
     float dtSeconds = deltaTime.asSeconds();
     if (dtSeconds <= 0) return;
     const float timeScaleFactor = dtSeconds * 60.0f;
 
-    float thrust = desiredAcceleration; // Use desired acceleration directly
+    // --- MODIFICAÇÃO AQUI ---
+    // Calcule a aceleração baseada nos controles booleanos
+    float currentAcceleration = 0.0f;
+    if (controls.forward) {
+        currentAcceleration += acceleration;
+    }
+    if (controls.reverse) {
+        // Pode ser freio ou ré. Se a IA só usa para frear, talvez só subtraia.
+        // Se pode dar ré, subtrai a aceleração. Vamos assumir que pode dar ré.
+        currentAcceleration -= acceleration; // Ou use -brakePower se for só freio
+    }
+    // --- FIM DA MODIFICAÇÃO ---
 
-    speed += thrust * timeScaleFactor;
+    // Aplica a aceleração calculada
+    speed += currentAcceleration * timeScaleFactor; // Usa a aceleração calculada dos controles
 
+    // Aplica atrito (como estava antes)
     float frictionForce = friction * timeScaleFactor;
     if (std::abs(speed) > 1e-5f) {
         if (std::abs(speed) > frictionForce) {
@@ -255,8 +272,10 @@ void Car::move(float aiBrakeSignal, sf::Time deltaTime) {
         }
     }
 
+    // Limita a velocidade (como estava antes)
     speed = std::clamp(speed, -maxSpeed * (2.0f / 3.0f), maxSpeed);
 
+    // Aplica a direção (como estava antes)
     if (std::abs(speed) > 1e-5f) {
         float flip = (speed > 0.0f) ? 1.0f : -1.0f;
         float turnRateRad = 0.03f * timeScaleFactor;
@@ -264,10 +283,12 @@ void Car::move(float aiBrakeSignal, sf::Time deltaTime) {
         if (controls.right) angle += turnRateRad * flip;
     }
 
+    // Atualiza a posição (como estava antes)
     position.x += std::sin(angle) * speed * timeScaleFactor;
     position.y -= std::cos(angle) * speed * timeScaleFactor;
 
-    lastAppliedAcceleration = thrust;
+    // Mantenha lastAppliedAcceleration se precisar para debug ou outra lógica
+    lastAppliedAcceleration = currentAcceleration;
 }
 
 
