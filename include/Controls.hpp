@@ -16,7 +16,6 @@ public:
     bool left = false;
     bool right = false;
     bool reverse = false;
-    bool brake = false; 
     ControlType type;
 
     Controls(ControlType t = ControlType::KEYS);

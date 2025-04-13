@@ -31,6 +31,7 @@ set(SOURCES
     src/Sensor.cpp
     src/Utils.cpp
     src/Visualizer.cpp
+    src/Obstacle.cpp
 )
 add_executable(${EXECUTABLE_NAME} ${SOURCES})
 

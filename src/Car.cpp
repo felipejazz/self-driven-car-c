@@ -1,6 +1,9 @@
-// src/Car.cpp (COMPLETO E ATUALIZADO com timer para 'stopped')
+// src/Car.cpp
+
 #include "Car.hpp"
 #include "Utils.hpp"
+#include "Obstacle.hpp"
+#include "Road.hpp"
 #include <iostream>
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/System/Vector2.hpp>
@@ -8,49 +11,44 @@
 #include <limits>
 #include <algorithm>
 #include <cmath>
+#include <deque>
+#include <unordered_set>
+#include <cstdint> // Include for uint8_t
 
 // --- Construtor ---
 Car::Car(float x, float y, float w, float h, ControlType type, float maxSpd, sf::Color col)
     : position(x, y),
-      width(w),
-      height(h),
-      maxSpeed(maxSpd),
-      acceleration(0.2f),
-      brakePower(acceleration * 2.0f),
-      friction(0.05f),
-      controlType(type),
-      controls(type),
-      color(col),
-      textureLoaded(false),
-      sprite(texture),
-      lastTurnDirection(0),
-      desiredAcceleration(0.0f),
-      lastAppliedAcceleration(0.0f),
-      previousDistanceAhead(-1.0f),
-      aggressiveDeltaFrames(0),
-      aggressiveFollowingTimer(0.0f),
-      // stoppedFrames(0), // Removido
-      stoppedTimer(0.0f), // Inicializa novo timer
-      reversingTimer(0.0f),
-      netDistanceTraveled(0.0f),
-      previousYPosition(y)
+      width(w), height(h), maxSpeed(maxSpd), acceleration(0.2f),
+      brakePower(acceleration * 2.0f), friction(0.05f), controlType(type),
+      controls(type), color(col), textureLoaded(false), sprite(texture),
+      lastTurnDirection(0), desiredAcceleration(0.0f), lastAppliedAcceleration(0.0f),
+      stoppedTimer(0.0f), reversingTimer(0.0f),
+      previousYPosition(y),
+      currentFitness(0.0f),
+      stuckCheckTimer(0.0f),
+      stuckCheckStartY(y)
 {
     useBrain = (controlType == ControlType::AI);
     loadTexture("assets/car.png");
-    if (!textureLoaded) { std::cerr << "Warning: Failed to load car texture (assets/car.png)." << std::endl; }
+    if (!textureLoaded) {
+        // std::cerr << "Warning: Failed to load car texture (assets/car.png)." << std::endl;
+    }
 
     if (controlType != ControlType::DUMMY) {
         sensor = std::make_unique<Sensor>(*this);
         if (useBrain && sensor) {
-             int rayCountValue = sensor ? static_cast<int>(sensor->rayCount) : 5;
-             const std::vector<int> networkStructure = {rayCountValue, 6, 5};
-             brain.emplace(NeuralNetwork(networkStructure));
+            int rayCountValue = sensor->rayCount;
+            if (rayCountValue <= 0) {
+                 std::cerr << "Error: Sensor created with 0 rays for AI car!" << std::endl;
+                 rayCountValue = 5; // Fallback
+            }
+            const std::vector<int> networkStructure = {rayCountValue, 12, 4};
+            brain.emplace(NeuralNetwork(networkStructure));
         }
     }
 }
 
 // --- loadTexture ---
-// ... (código existente sem alterações) ...
 void Car::loadTexture(const std::string& filename) {
     textureLoaded = false;
     if (!texture.loadFromFile(filename)) return;
@@ -61,7 +59,6 @@ void Car::loadTexture(const std::string& filename) {
         sprite.setScale({width / textureRect.size.x, height / textureRect.size.y});
     } else {
         sprite.setScale({1.0f, 1.0f});
-        std::cerr << "Warning: Texture loaded with zero dimensions: " << filename << std::endl;
         return;
     }
     sprite.setOrigin({textureRect.size.x / 2.0f, textureRect.size.y / 2.0f});
@@ -69,179 +66,196 @@ void Car::loadTexture(const std::string& filename) {
     textureLoaded = true;
 }
 
-
 // --- Getters ---
-// ... (código existente sem alterações) ...
 int Car::getSensorRayCount() const { return sensor ? static_cast<int>(sensor->rayCount) : 0; }
-float Car::getPreviousDistanceAhead() const { return previousDistanceAhead; }
-int Car::getAggressiveDeltaFrames() const { return aggressiveDeltaFrames; }
 
-
-// --- resetDamage ---
-// ... (código existente sem alterações) ...
-void Car::resetDamage() { damaged = false; }
-
-// --- resetForTraffic (MODIFICADO) ---
-void Car::resetForTraffic(const sf::Vector2f& startPos, float startSpeed) {
-    damaged = false;
-    speed = startSpeed;
-    position = startPos;
+// --- resetForNewGeneration ---
+void Car::resetForNewGeneration(float startY, const Road& road) {
+    position = { road.getLaneCenter(1), startY };
     angle = 0.0f;
-    netDistanceTraveled = 0.0f;
-    previousYPosition = startPos.y;
-    stoppedTimer = 0.0f; // *** Reseta o timer de parado ***
-    reversingTimer = 0.0f; // *** Reseta o timer de ré *** = 0;
-    aggressiveDeltaFrames = 0;
-    aggressiveFollowingTimer = 0.0f;
-    previousDistanceAhead = -1.0f;
-    lastTurnDirection = 0;
+    speed = 0.0f;
+    damaged = false;
+    currentFitness = 0.0f;
+    previousYPosition = startY;
+    stoppedTimer = 0.0f;
+    reversingTimer = 0.0f;
     desiredAcceleration = 0.0f;
     lastAppliedAcceleration = 0.0f;
-    controls.forward = (controlType == ControlType::DUMMY);
-    controls.reverse = false;
-    controls.left = false;
-    controls.right = false;
-    controls.brake = false;
+    lastTurnDirection = 0;
+    stuckCheckTimer = 0.0f;
+    stuckCheckStartY = startY;
+    passedObstacleIDs.clear();
 }
 
-// --- calculateMinDistanceAhead ---
-// ... (código existente sem alterações) ...
-float Car::calculateMinDistanceAhead(const std::vector<Car*>& traffic, Car** nearestCarOut) {
-    float minDistance = std::numeric_limits<float>::max();
-    Car* nearest = nullptr;
-    float checkWidth = this->width * 2.0f;
+// --- Update ---
+// --- Update ---
+void Car::update(const Road& road, const std::vector<Obstacle*>& obstacles, sf::Time deltaTime) {
+    bool wasAlreadyDamaged = damaged; // Guarda o estado ANTES das checagens de status
+    if (wasAlreadyDamaged) {
+        speed = 0; // Garante que carros já danificados não se movam
+        return;    // Sai do update se já começou danificado
+    }
 
-    for (const auto& otherCarPtr : traffic) {
-        if (!otherCarPtr || otherCarPtr == this) continue;
-        if (otherCarPtr->position.y < this->position.y) {
-            if (std::abs(otherCarPtr->position.x - this->position.x) < checkWidth) {
-                float frontY = this->position.y - this->height / 2.0f;
-                float otherRearY = otherCarPtr->position.y + otherCarPtr->height / 2.0f;
-                float distance = frontY - otherRearY;
-                if (distance >= 0 && distance < minDistance) {
-                    minDistance = distance;
-                    nearest = otherCarPtr;
+    // 1. Update Sensor (se existir)
+    if (sensor) { sensor->update(road.borders, obstacles); }
+
+    // 2. Determine Controls (AI, Keys, Dummy)
+    bool setControlsFromNN = false;
+    desiredAcceleration = 0.0f;
+
+    if (controlType == ControlType::KEYS) {
+         controls.update(); // Atualiza baseado no teclado
+        if(controls.forward) desiredAcceleration = acceleration;
+        if(controls.reverse) desiredAcceleration = -acceleration;
+    }
+    else if (useBrain && brain && sensor) { // Lógica AI
+        std::vector<float> sensorOffsets(sensor->rayCount);
+        for (size_t i = 0; i < sensor->rayCount; ++i) {
+             sensorOffsets[i] = (i < sensor->readings.size() && sensor->readings[i])
+                                ? (1.0f - sensor->readings[i]->offset) : 0.0f;
+        }
+        std::vector<float> outputs = NeuralNetwork::feedForward(sensorOffsets, *brain);
+        if (outputs.size() >= 4) {
+            // Ajuste os thresholds conforme necessário (ex: 0.6 para acelerar, 0.4 para frear/ré)
+            if (outputs[0] > 0.6f) desiredAcceleration = acceleration;      // Acelerar
+            else if (outputs[0] < 0.4f) desiredAcceleration = -acceleration; // Frear/Ré
+            else desiredAcceleration = 0.0f;                               // Neutro
+
+            controls.forward = (desiredAcceleration > 0.0f);
+            controls.reverse = (desiredAcceleration < 0.0f);
+            controls.left = (outputs[1] > 0.5f); // Virar esquerda
+            controls.right = (outputs[2] > 0.5f); // Virar direita
+            // outputs[3] (freio) não está sendo usado diretamente para 'desiredAcceleration' aqui, mas poderia ser
+            setControlsFromNN = true;
+        } else {
+            std::cerr << "Error: Brain output size mismatch!" << std::endl;
+             // Fallback: não fazer nada ou usar comportamento padrão
+             controls.forward = false; controls.reverse = false; controls.left = false; controls.right = false;
+        }
+    }
+    else if (controlType == ControlType::DUMMY) { // Lógica Dummy
+        controls.forward = true; controls.reverse = false; controls.left = false; controls.right = false;
+        desiredAcceleration = acceleration;
+    }
+
+    // 3. Anti-Pendulum (Opcional - não implementado)
+    // ...
+
+    // 4. Move Car
+    move(0.0f, deltaTime); // O parâmetro aiBrakeSignal não está sendo usado aqui
+
+    // 5. Update Overtake Status (adiciona bônus se passou por um obstáculo)
+    updateOvertakeStatus(obstacles);
+
+    // 6. Update Fitness (distância, sobrevivência por frame, recompensa por velocidade)
+    float deltaY = previousYPosition - position.y; // Y diminui ao avançar
+    currentFitness += deltaY; // Recompensa principal por avançar
+    currentFitness += FITNESS_FRAME_SURVIVAL_REWARD; // Pequena recompensa por sobreviver mais um frame
+    if (speed > FITNESS_SPEED_REWARD_THRESHOLD) {
+        currentFitness += FITNESS_SPEED_REWARD; // Recompensa extra por estar rápido
+    }
+    previousYPosition = position.y; // Atualiza a posição Y anterior para o próximo frame
+
+    // 7. Checagens de Status (Parado, Ré, Preso) & Aplica Penalidades se danificado NESTE frame
+
+    // Checa se ficou parado tempo demais
+    checkStoppedStatus(deltaTime);
+    if (damaged && !wasAlreadyDamaged) { // Se ficou danificado AGORA por estar parado
+        currentFitness -= FITNESS_STOPPED_PENALTY;
+        // std::cout << "Car " << this << " penalized for stopping." << std::endl; // Debug
+        return; // Sai do update
+    }
+
+    // Checa se ficou em marcha à ré tempo demais
+    checkReversingStatus(deltaTime);
+     if (damaged && !wasAlreadyDamaged) { // Se ficou danificado AGORA por estar de ré
+        currentFitness -= FITNESS_REVERSING_PENALTY;
+        // std::cout << "Car " << this << " penalized for reversing." << std::endl; // Debug
+        return; // Sai do update
+    }
+
+    // --- NOVA CHECAGEM ---
+    // Checa se ficou preso (sem avançar o suficiente)
+    checkStuckStatus(deltaTime);
+     if (damaged && !wasAlreadyDamaged) { // Se ficou danificado AGORA por estar preso
+        currentFitness -= FITNESS_STUCK_PENALTY;
+        // std::cout << "Car " << this << " penalized for being stuck." << std::endl; // Debug
+        return; // Sai do update
+    }
+    // --- FIM NOVA CHECAGEM ---
+
+
+    // 8. Checa Colisão & Aplica Penalidades (se colidiu NESTE frame)
+    Obstacle* hitObstacle = nullptr;
+    bool collisionOccurred = checkForCollision(road.borders, obstacles, hitObstacle);
+
+    if (collisionOccurred) {
+         // Somente aplica penalidade de colisão se não foi danificado *antes* da colisão neste frame
+         if (!damaged) { // Evita penalizar duas vezes se já foi danificado por tempo/stuck
+            damaged = true; // Marca como danificado pela colisão
+            currentFitness -= FITNESS_COLLISION_PENALTY; // Penalidade base por colisão
+
+            if (hitObstacle) { // Colisão com obstáculo específico
+                // Se o obstáculo atingido NÃO estava na lista de ultrapassados
+                if (passedObstacleIDs.find(hitObstacle->id) == passedObstacleIDs.end()) {
+                    currentFitness -= FITNESS_FAIL_OVERTAKE_PENALTY; // Penalidade extra por falhar na ultrapassagem
+                    // std::cout << "Car " << this << " penalized for hitting obstacle " << hitObstacle->id << " before passing." << std::endl; // Debug
+                } else {
+                    // std::cout << "Car " << this << " hit obstacle " << hitObstacle->id << " AFTER passing." << std::endl; // Debug opcional
                 }
             }
+         }
+        speed = 0; // Para o carro na colisão
+         // Não precisa de 'return' aqui, pois a condição !damaged no início do loop já trata isso no próximo frame
+    }
+} // Fim Car::update
+
+// --- checkStuckStatus ---
+void Car::checkStuckStatus(sf::Time deltaTime) {
+    if (damaged || controlType != ControlType::AI) { // Só checa AI não danificados
+        stuckCheckTimer = 0.0f; // Reseta timer se não aplicável
+        stuckCheckStartY = position.y; // Atualiza posição inicial da checagem
+        return;
+    }
+
+    stuckCheckTimer += deltaTime.asSeconds();
+
+    // Se o tempo da checagem foi atingido
+    if (stuckCheckTimer >= STUCK_TIME_THRESHOLD_SECONDS) {
+        // Calcula o quanto o carro avançou (Y diminui para frente)
+        float distanceMovedForwardY = stuckCheckStartY - position.y;
+
+        // Se moveu menos que o limite para frente (ou até moveu para trás)
+        if (distanceMovedForwardY < STUCK_DISTANCE_Y_THRESHOLD) {
+             // std::cout << "Car " << this << " detectado como preso! DistY: " << distanceMovedForwardY << std::endl; // Debug
+            damaged = true; // Marca como danificado
         }
-    }
-    if (nearestCarOut) *nearestCarOut = nearest;
-    return minDistance;
-}
 
-
-// --- Update (MODIFICADO) ---
-void Car::update(const std::vector<std::pair<sf::Vector2f, sf::Vector2f>>& roadBorders,
-                 std::vector<Car*>& traffic,
-                 sf::Time deltaTime)
-{
-    if (damaged) return;
-
-    // 1. Atualiza Sensor
-    if (sensor) { sensor->update(roadBorders, traffic); }
-
-    // 2. Determina Controles
-    bool intendedTurnLeft = false;
-    bool intendedTurnRight = false;
-    bool setControlsFromNN = false;
-    float aiBrakeSignal = 0.0f;
-    // Resetar intenção da IA (será definida abaixo se AI)
-    desiredAcceleration = 0.0f; // Resetar intenção de aceleração/ré da IA
-
-    if (controlType == ControlType::KEYS) { controls.update(); }
-    else if (useBrain && brain && sensor) {
-        std::vector<float> sensorOffsets(sensor->rayCount);
-        for (size_t i = 0; i < sensor->readings.size(); ++i) { sensorOffsets[i] = sensor->readings[i] ? (1.0f - sensor->readings[i]->offset) : 0.0f; }
-        std::vector<float> outputs = NeuralNetwork::feedForward(sensorOffsets, *brain);
-        if (outputs.size() >= 5) {
-            // *** Atualiza desiredAcceleration baseado na saída 0 ***
-            if (outputs[0] > 0.6f) desiredAcceleration = acceleration;
-            else if (outputs[0] < 0.4f) desiredAcceleration = -acceleration; // Intenção de ré
-            else desiredAcceleration = 0.0f;
-            // Define controles booleanos baseado na intenção (para compatibilidade com 'move' e lógica anti-pendulo)
-            controls.forward = (desiredAcceleration > 0.0f);
-            controls.reverse = (desiredAcceleration < 0.0f); // Intenção de ré
-
-            intendedTurnLeft = (outputs[1] > 0.5f);
-            intendedTurnRight = (outputs[2] > 0.5f);
-            aiBrakeSignal = outputs[3];
-            // Saída 4 não usada diretamente para controle de ré aqui, usamos desiredAcceleration
-            setControlsFromNN = true;
-        }
-        // Garante que controle de freio manual não interfira
-        controls.brake = false;
-    }
-    else if (controlType == ControlType::DUMMY) {
-        controls.forward = true; controls.reverse = false; controls.left = false; controls.right = false; controls.brake = false;
-        desiredAcceleration = acceleration; // Dummy tem intenção de acelerar
-    }
-
-    // 3. Lógica Anti-Pêndulo
-    if (setControlsFromNN) {
-        int turn = 0; if(intendedTurnLeft && !intendedTurnRight) turn = -1; else if(intendedTurnRight && !intendedTurnLeft) turn = 1;
-        bool isOscillating = (turn != 0 && turn == -lastTurnDirection);
-        if (isOscillating) { controls.left = false; controls.right = false;} else { controls.left = intendedTurnLeft; controls.right = intendedTurnRight;}
-        lastTurnDirection = turn;
-    } else if (controlType == ControlType::KEYS) {
-        int turn = 0; if(controls.left && !controls.right) turn = -1; else if(controls.right && !controls.left) turn = 1; lastTurnDirection=turn;
-    } else { lastTurnDirection = 0; }
-
-    // 4. Move o Carro
-    move(aiBrakeSignal, deltaTime);
-
-    // 5. Atualiza Score
-    if (controlType == ControlType::AI) {
-        float deltaY = previousYPosition - position.y;
-        netDistanceTraveled += deltaY;
-    }
-
-    // --- Verificações de Dano ---
-    // 6. Checa Following Agressivo
-    checkAggressiveFollowing(traffic, deltaTime);
-    if (damaged) return;
-
-    // 7. Checa Dano por Estar Parado
-    checkStoppedStatus(deltaTime);
-    if (damaged) return;
-
-    // 8. *** Checa Dano por Marcha à Ré (usando timer) ***
-    checkReversingStatus(deltaTime); // Chama a nova função
-    if (damaged) return;
-
-    // Atualiza Posição Y Anterior
-    previousYPosition = position.y;
-
-    // 9. Avalia Dano por Colisão
-    if (!damaged) {
-        damaged = checkForCollision(roadBorders, traffic);
-        if(damaged) { std::cerr << "WARN: Car " << this << " damaged - COLLISION." << std::endl;}
+        // Reseta para a próxima checagem, independentemente de ter ficado preso ou não
+        stuckCheckTimer = 0.0f;
+        stuckCheckStartY = position.y;
     }
 }
-
-
 // --- move ---
-// ... (código existente sem alterações) ...
 void Car::move(float aiBrakeSignal, sf::Time deltaTime) {
-    if (damaged) { speed = 0; return; }
     float dtSeconds = deltaTime.asSeconds();
     if (dtSeconds <= 0) return;
     const float timeScaleFactor = dtSeconds * 60.0f;
 
-    float thrust = 0.0f;
-    float appliedBrakingForce = 0.0f;
-
-    // Thrust agora considera desiredAcceleration para AI
-    if (controlType == ControlType::AI) { thrust = desiredAcceleration; }
-    else { if (controls.forward) thrust += acceleration; if (controls.reverse) thrust -= acceleration; }
-
-    if (controlType == ControlType::AI) { if (aiBrakeSignal > 0.5f) appliedBrakingForce = brakePower; }
-    else { if (controls.brake) appliedBrakingForce = brakePower; }
+    float thrust = desiredAcceleration; // Use desired acceleration directly
 
     speed += thrust * timeScaleFactor;
 
-    float totalDecelerationForce = (appliedBrakingForce + friction) * timeScaleFactor;
-    if (std::abs(speed) > 1e-5f) { if (std::abs(speed) > totalDecelerationForce) { speed -= totalDecelerationForce * std::copysign(1.0f, speed); } else { speed = 0.0f; } }
-    speed = std::clamp(speed, -maxSpeed * (2.0f/3.0f), maxSpeed);
+    float frictionForce = friction * timeScaleFactor;
+    if (std::abs(speed) > 1e-5f) {
+        if (std::abs(speed) > frictionForce) {
+            speed -= frictionForce * std::copysign(1.0f, speed);
+        } else {
+            speed = 0.0f;
+        }
+    }
+
+    speed = std::clamp(speed, -maxSpeed * (2.0f / 3.0f), maxSpeed);
 
     if (std::abs(speed) > 1e-5f) {
         float flip = (speed > 0.0f) ? 1.0f : -1.0f;
@@ -249,164 +263,125 @@ void Car::move(float aiBrakeSignal, sf::Time deltaTime) {
         if (controls.left) angle -= turnRateRad * flip;
         if (controls.right) angle += turnRateRad * flip;
     }
-    position.x -= std::sin(angle) * speed * timeScaleFactor;
+
+    position.x += std::sin(angle) * speed * timeScaleFactor;
     position.y -= std::cos(angle) * speed * timeScaleFactor;
-    lastAppliedAcceleration = thrust; // Pode ser útil manter isso
-}
 
-void Car::checkReversingStatus(sf::Time deltaTime) {
-    // Só executa para carros AI que não estão danificados
-    if (damaged || controlType != ControlType::AI) {
-        reversingTimer = 0.0f; // Reseta se não for AI ou já danificado
-        return;
-    }
-
-    // Condição para considerar "em ré": velocidade negativa E intenção de ré (da IA)
-    // Usamos desiredAcceleration < 0 como indicador da intenção da IA de ir para trás.
-    bool isReversingIntended = (speed < -0.05f) && (desiredAcceleration < 0.0f);
-    // Alternativa: usar controls.reverse se a IA definir esse booleano corretamente
-    // bool isReversingIntended = (speed < -0.05f) && controls.reverse;
-
-    if (isReversingIntended) {
-        // Incrementa o timer de ré
-        reversingTimer += deltaTime.asSeconds();
-    } else {
-        // Se não está em ré (ou a intenção mudou), reseta o timer
-        reversingTimer = 0.0f;
-    }
-
-    // Verifica se o limite de tempo em ré foi atingido
-    if (reversingTimer >= REVERSE_TIME_THRESHOLD_SECONDS) {
-        // Aplica dano se ainda não foi danificado neste frame
-        if (!damaged) {
-            damaged = true;
-            speed = 0; // Para o carro
-            std::cerr << "WARN: Car " << this << " damaged - REVERSING for "
-                      << reversingTimer << "s (Threshold: "
-                      << REVERSE_TIME_THRESHOLD_SECONDS << "s)." << std::endl;
-            reversingTimer = 0.0f; // Reseta após aplicar dano
-        }
-    }
-}
-
-// --- checkAggressiveFollowing ---
-// ... (código existente da resposta anterior, sem alterações) ...
-void Car::checkAggressiveFollowing(const std::vector<Car*>& traffic, sf::Time deltaTime) {
-    if (damaged || controlType != ControlType::AI) return;
-    float currentDistance = calculateMinDistanceAhead(traffic);
-    bool hasValidCurrent = (currentDistance < std::numeric_limits<float>::max());
-    float delta = 0.0f;
-    if (hasValidCurrent && previousDistanceAhead >= 0.0f) { delta = currentDistance - previousDistanceAhead; }
-    else if (!hasValidCurrent) { delta = 1.0f; }
-
-    bool isFollowingAggressively = hasValidCurrent &&
-                                  (currentDistance > AGGRESSIVE_DISTANCE_THRESHOLD) &&
-                                  (currentDistance < AGGRESSIVE_DISTANCE_MAX);
-                                //   (delta < AGGRESSIVE_DELTA_THRESHOLD);
-
-    if (isFollowingAggressively) { aggressiveDeltaFrames++; } else { aggressiveDeltaFrames = 0; }
-    if (isFollowingAggressively) { aggressiveFollowingTimer += deltaTime.asSeconds(); }
-    else { aggressiveFollowingTimer = 0.0f; }
-
-    if (aggressiveFollowingTimer >= AGGRESSIVE_FOLLOWING_DURATION_THRESHOLD) {
-        if (!damaged) {
-            damaged = true; speed = 0;
-            std::cerr << "WARN: Car " << this << " damaged - AGGRESSIVE following criteria met (Dist: "
-                      << currentDistance << ", Delta: " << delta << ", Time: " << aggressiveFollowingTimer << "s)." << std::endl;
-            aggressiveFollowingTimer = 0.0f; aggressiveDeltaFrames = 0;
-        }
-    }
-    previousDistanceAhead = hasValidCurrent ? currentDistance : -1.0f;
+    lastAppliedAcceleration = thrust;
 }
 
 
-// --- *** NOVA FUNÇÃO: checkStoppedStatus *** ---
+// --- checkStoppedStatus ---
 void Car::checkStoppedStatus(sf::Time deltaTime) {
-    // Só executa para carros AI que não estão danificados
-    if (damaged || controlType != ControlType::AI) {
-        stoppedTimer = 0.0f; // Reseta se não for AI ou já danificado
-        return;
-    }
-
-    // Verifica se a velocidade está abaixo do limiar de "parado"
-    if (std::abs(speed) < STOPPED_SPEED_THRESHOLD) {
-        // Incrementa o timer de parado
-        stoppedTimer += deltaTime.asSeconds();
-    } else {
-        // Se o carro está se movendo, reseta o timer
-        stoppedTimer = 0.0f;
-    }
-
-    // Verifica se o limite de tempo parado foi atingido
+    if (damaged || controlType != ControlType::AI) { stoppedTimer = 0.0f; return; }
+    if (std::abs(speed) < STOPPED_SPEED_THRESHOLD) { stoppedTimer += deltaTime.asSeconds(); }
+    else { stoppedTimer = 0.0f; }
     if (stoppedTimer >= STOPPED_TIME_THRESHOLD_SECONDS) {
-        // Aplica dano se ainda não foi danificado neste frame
-        if (!damaged) {
-            damaged = true;
-            speed = 0; // Garante que pare completamente
-            std::cerr << "WARN: Car " << this << " damaged - STOPPED for "
-                      << stoppedTimer << "s (Threshold: "
-                      << STOPPED_TIME_THRESHOLD_SECONDS << "s)." << std::endl;
-            stoppedTimer = 0.0f; // Reseta após aplicar dano
-        }
+        damaged = true;
     }
 }
 
+// --- checkReversingStatus ---
+void Car::checkReversingStatus(sf::Time deltaTime) {
+    if (damaged || controlType != ControlType::AI) { reversingTimer = 0.0f; return; }
+    bool isReversingEffectively = (speed < -0.05f) && (desiredAcceleration < 0.0f);
+    if (isReversingEffectively) { reversingTimer += deltaTime.asSeconds(); }
+    else { reversingTimer = 0.0f; }
+    if (reversingTimer >= REVERSE_TIME_THRESHOLD_SECONDS) {
+        damaged = true;
+    }
+}
+
+// --- updateOvertakeStatus ---
+void Car::updateOvertakeStatus(const std::vector<Obstacle*>& obstacles) {
+    float carFrontY = position.y - height / 2.0f;
+    for (const auto* obsPtr : obstacles) {
+        if (!obsPtr || passedObstacleIDs.count(obsPtr->id)) continue;
+        float obstacleRearY = obsPtr->position.y + obsPtr->height / 2.0f;
+        if (carFrontY < obstacleRearY) {
+            passedObstacleIDs.insert(obsPtr->id);
+            currentFitness += FITNESS_OVERTAKE_BONUS;
+        }
+    }
+}
 
 // --- getPolygon ---
-// ... (código existente sem alterações) ...
 std::vector<sf::Vector2f> Car::getPolygon() const {
-    std::vector<sf::Vector2f> points(4);
-    const float rad = std::hypot(width, height) / 2.0f;
-    const float alpha = std::atan2(width, height);
-    float currentAngle = angle; // Radianos
-
-    points[0] = { position.x - std::sin(currentAngle - alpha) * rad, position.y - std::cos(currentAngle - alpha) * rad };
-    points[1] = { position.x - std::sin(currentAngle + alpha) * rad, position.y - std::cos(currentAngle + alpha) * rad };
-    points[2] = { position.x - std::sin(static_cast<float>(M_PI) + currentAngle - alpha) * rad, position.y - std::cos(static_cast<float>(M_PI) + currentAngle - alpha) * rad };
-    points[3] = { position.x - std::sin(static_cast<float>(M_PI) + currentAngle + alpha) * rad, position.y - std::cos(static_cast<float>(M_PI) + currentAngle + alpha) * rad };
-    return points;
+    // (Implementation unchanged from previous correct version)
+     std::vector<sf::Vector2f> points(4);
+     const float rad = std::hypot(width, height) / 2.0f;
+     const float alpha = std::atan2(width, height);
+     sf::Vector2f rel_top_right     = {  rad * std::sin(alpha), -rad * std::cos(alpha) };
+     sf::Vector2f rel_bottom_right  = {  rad * std::sin(-alpha), -rad * std::cos(-alpha) };
+     sf::Vector2f rel_bottom_left   = {  rad * std::sin(static_cast<float>(M_PI) + alpha), -rad * std::cos(static_cast<float>(M_PI) + alpha) };
+     sf::Vector2f rel_top_left      = {  rad * std::sin(static_cast<float>(M_PI) - alpha), -rad * std::cos(static_cast<float>(M_PI) - alpha) };
+     float sinA = std::sin(angle);
+     float cosA = std::cos(angle);
+     points[0] = position + sf::Vector2f(rel_top_right.x * cosA - rel_top_right.y * sinA, rel_top_right.x * sinA + rel_top_right.y * cosA);
+     points[1] = position + sf::Vector2f(rel_bottom_right.x * cosA - rel_bottom_right.y * sinA, rel_bottom_right.x * sinA + rel_bottom_right.y * cosA);
+     points[2] = position + sf::Vector2f(rel_bottom_left.x * cosA - rel_bottom_left.y * sinA, rel_bottom_left.x * sinA + rel_bottom_left.y * cosA);
+     points[3] = position + sf::Vector2f(rel_top_left.x * cosA - rel_top_left.y * sinA, rel_top_left.x * sinA + rel_top_left.y * cosA);
+     return points;
 }
 
+
 // --- checkForCollision ---
-// ... (código existente sem alterações) ...
-bool Car::checkForCollision(const std::vector<std::pair<sf::Vector2f, sf::Vector2f>>& roadBorders, const std::vector<Car*>& traffic) {
-    if (damaged) return true;
+bool Car::checkForCollision(const std::vector<std::pair<sf::Vector2f, sf::Vector2f>>& roadBorders,
+                           const std::vector<Obstacle*>& obstacles,
+                           Obstacle*& hitObstacle)
+{
+    hitObstacle = nullptr;
     std::vector<sf::Vector2f> carPoly = getPolygon();
+
+    // Collision with borders
     for (const auto& border : roadBorders) {
         for (size_t i = 0; i < carPoly.size(); ++i) {
-            if (getIntersection(carPoly[i], carPoly[(i + 1) % carPoly.size()], border.first, border.second)) { return true; }
+            if (getIntersection(carPoly[i], carPoly[(i + 1) % carPoly.size()], border.first, border.second)) {
+                return true;
+            }
         }
-     }
-    for (const Car* otherCarPtr : traffic) {
-        if (!otherCarPtr || otherCarPtr == this) continue;
-        if (polysIntersect(carPoly, otherCarPtr->getPolygon())) { return true; }
-     }
+    }
+    // Collision with obstacles
+    for (Obstacle* obsPtr : obstacles) {
+        if (!obsPtr) continue;
+        if (polysIntersect(carPoly, obsPtr->getPolygon())) {
+            hitObstacle = obsPtr;
+            return true;
+        }
+    }
     return false;
 }
 
 // --- draw ---
-// ... (código existente sem alterações) ...
 void Car::draw(sf::RenderTarget& target, bool drawSensorFlag) {
-     sf::Color drawColorToUse = damaged ? sf::Color(100, 100, 100, 180) : color;
-     if (textureLoaded) {
-         sprite.setColor(drawColorToUse); sprite.setPosition(position);
-         sprite.setRotation(sf::degrees(angle * 180.0f / static_cast<float>(M_PI)));
-         target.draw(sprite);
-     }
-     else {
-        sf::RectangleShape fallbackRect({width, height}); fallbackRect.setOrigin({width / 2.0f, height / 2.0f});
-        fallbackRect.setPosition(position); fallbackRect.setRotation(sf::degrees(angle * 180.0f / static_cast<float>(M_PI)));
-        sf::Color fallbackColor = drawColorToUse;
-        if (!damaged) {
-             switch (controlType) {
-                case ControlType::DUMMY: fallbackColor = sf::Color::Red; break;
-                case ControlType::AI:    fallbackColor = sf::Color(0, 0, 255, 180); break;
-                case ControlType::KEYS:  fallbackColor = sf::Color::Blue; break;
-                default: fallbackColor = sf::Color::White; break;
-             }
-        }
-        fallbackRect.setFillColor(fallbackColor); fallbackRect.setOutlineColor(sf::Color::White); fallbackRect.setOutlineThickness(1);
+    sf::Color drawColorToUse = color;
+    if (damaged) {
+        // CORRECTION: sf::Uint8 -> uint8_t
+        drawColorToUse.r = static_cast<uint8_t>(std::max(0, drawColorToUse.r - 100));
+        drawColorToUse.g = static_cast<uint8_t>(std::max(0, drawColorToUse.g - 100));
+        drawColorToUse.b = static_cast<uint8_t>(std::max(0, drawColorToUse.b - 100));
+        drawColorToUse.a = 180;
+    }
+
+    if (textureLoaded) {
+        sprite.setColor(drawColorToUse);
+        sprite.setPosition(position);
+        // Assuming 'angle' is in radians, convert to degrees for SFML's setRotation
+        sprite.setRotation(sf::degrees(angle) * 180.0f / static_cast<float>(M_PI)); // Convert radians to degrees
+        target.draw(sprite);
+    } else {
+        sf::RectangleShape fallbackRect({width, height});
+        fallbackRect.setOrigin({width / 2.0f, height / 2.0f});
+        fallbackRect.setPosition(position);
+        // Assuming 'angle' is in radians, convert to degrees for SFML's setRotation
+        fallbackRect.setRotation(sf::degrees(angle) * 180.0f / static_cast<float>(M_PI)); // Convert radians to degrees
+        fallbackRect.setFillColor(drawColorToUse);
+        fallbackRect.setOutlineColor(sf::Color::Black);
+        fallbackRect.setOutlineThickness(1);
         target.draw(fallbackRect);
-     }
-     if (sensor && drawSensorFlag && !damaged) { sensor->draw(target); }
- }
+    }
+
+    if (sensor && drawSensorFlag) {
+        sensor->draw(target);
+    }
+}

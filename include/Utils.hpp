@@ -1,11 +1,11 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
-#include <SFML/Graphics.hpp> // <<--- ESTE É O PONTO CHAVE
+#include <SFML/Graphics.hpp>
 #include <vector>
 #include <optional>
-#include <random> // Include necessary headers here too
-#include <cstdint> // For uint8_t
+#include <random>
+#include <cstdint> // <--- Make sure this is included
 
 // Structure for intersection results
 struct IntersectionData {
@@ -16,7 +16,7 @@ struct IntersectionData {
 // Function Declarations (Prototypes)
 float lerp(float a, float b, float t);
 float getRandom();
-float getRandomSigned(); // <<< --- ADD THIS DECLARATION
+float getRandomSigned();
 std::optional<IntersectionData> getIntersection(
     const sf::Vector2f& A, const sf::Vector2f& B,
     const sf::Vector2f& C, const sf::Vector2f& D);
@@ -27,5 +27,4 @@ sf::Color hslToRgb(float h, float s, float l);
 sf::Color getValueColor(float value);
 sf::Color getRandomColor();
 
-
-#endif // UTILS_HPP 
+#endif // UTILS_HPP
