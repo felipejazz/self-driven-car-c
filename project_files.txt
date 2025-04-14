@@ -1,0 +1,1085 @@
+=== include/Car.hpp ===
+
+#ifndef CAR_HPP
+#define CAR_HPP
+
+#include <vector>
+#include <string>
+#include "Util.hpp"
+#include "Controls.hpp"  // Incluído para disponibilizar a definição completa de Controls
+
+class Sensor;
+class NeuralNetwork;
+
+class Car {
+public:
+    Car(double x, double y, double width, double height, const std::string& controlType, double maxSpeed = 3.0);
+    ~Car();
+
+    void update(const std::vector<std::pair<Point, Point>>& roadBorders,
+                const std::vector<Car*>& traffic);
+
+    void draw(sf::RenderWindow& window) const; // Adiciona o parâmetro window
+    double x;
+    double y;
+    double width;
+    double height;
+    double speed;
+    double acceleration;
+    double maxSpeed;
+    double friction;
+    double angle;
+    bool damaged;
+    std::vector<Point> polygon;
+
+    Sensor* sensor;
+    NeuralNetwork* brain;
+    Controls* controls;
+    bool useBrain;
+
+    AABB getAABB() const;
+
+private:
+    bool assessDamage(const std::vector<std::pair<Point, Point>>& roadBorders,
+                      const std::vector<Car*>& traffic);
+    std::vector<Point> createPolygon();
+    void move();
+};
+
+#endif // CAR_HPP
+
+=================================================================
+
+=== include/Controls.hpp ===
+
+#ifndef CONTROLS_HPP
+#define CONTROLS_HPP
+
+#include <SFML/Window/Keyboard.hpp>
+#include <SFML/Window/Event.hpp>
+#include <string>
+
+class Controls {
+public:
+    bool forward;
+    bool left;
+    bool right;
+    bool reverse;
+
+    // Construtores.
+    Controls();
+    Controls(const std::string& controlType);
+
+    // Atualiza os estados com base na tecla pressionada ou liberada.
+    void setKeyPressed(sf::Keyboard::Key key);
+    void setKeyReleased(sf::Keyboard::Key key);
+    void update(const sf::Event& event);
+};
+
+#endif // CONTROLS_HPP
+
+=================================================================
+
+=== include/NeuralNetwork.hpp ===
+
+#ifndef NEURALNETWORK_HPP
+#define NEURALNETWORK_HPP
+
+#include <vector>
+
+class Level {
+public:
+    std::vector<double> inputs;                      // Entradas
+    std::vector<double> outputs;                     // Saídas
+    std::vector<double> biases;                      // Vieses
+    std::vector<std::vector<double>> weights;        // Pesos entre camadas
+
+    // Construtor para criar um nível com o número de neurônios necessário
+    Level(int inputCount, int outputCount);
+
+    // Realiza o feed-forward no nível.
+    static std::vector<double> feedForward(const std::vector<double>& givenInputs, Level& level);
+
+private:
+    static void randomize(Level& level);
+};
+
+class NeuralNetwork {
+public:
+    std::vector<Level> levels;
+
+    // Construtor que cria a rede com base em um vetor com a contagem de neurônios por camada.
+    NeuralNetwork(const std::vector<int>& neuronCounts);
+
+    // Feed-forward em toda a rede.
+    static std::vector<double> feedForward(const std::vector<double>& givenInputs, NeuralNetwork* network);
+};
+
+#endif // NEURALNETWORK_HPP
+
+=================================================================
+
+=== include/Road.hpp ===
+
+#ifndef ROAD_HPP
+#define ROAD_HPP
+
+#include <SFML/Graphics.hpp>
+#include <vector>
+#include <limits>
+#include <algorithm>
+#include <cmath>
+#include "Util.hpp"
+
+// Constante para representar um valor de "infinito" vertical.
+const float MY_INFINITY = 100000000.f;
+
+class Road {
+public:
+    // Construtor: x é o centro horizontal, width é a largura total e laneCount (faixas) tem valor padrão 3.
+    Road(float x, float width, int laneCount = 3);
+
+    // Retorna a posição central de uma dada faixa.
+    float getLaneCenter(int laneIndex) const;
+
+    // Desenha a estrada no render target.
+    void draw(sf::RenderWindow& window) const;
+
+    // Retorna as bordas da estrada (usadas na detecção de colisão).
+    std::vector<std::pair<Point, Point>> getBorders() const { return borders; }
+
+private:
+    float x;
+    float width;
+    int laneCount;
+    float left;
+    float right;
+    float top;
+    float bottom;
+    Point topLeft;
+    Point topRight;
+    Point bottomLeft;
+    Point bottomRight;
+    std::vector<std::pair<Point, Point>> borders; // Para colisão, cada par de pontos representa uma borda.
+};
+
+#endif // ROAD_HPP
+
+=================================================================
+
+=== include/Sensor.hpp ===
+
+#ifndef SENSOR_HPP
+#define SENSOR_HPP
+
+#include <SFML/Graphics.hpp>
+#include <vector>
+#include <optional>
+#include "Util.hpp"
+
+// Forward declaration da classe Car para evitar incluir o Car.hpp neste header.
+class Car;
+
+class Sensor {
+public:
+    // Construtor que recebe um ponteiro para um objeto Car.
+    Sensor(Car* car);
+
+    // Atualiza as leituras do sensor com base nas bordas da estrada e no tráfego.
+    void update(const std::vector<std::pair<Point, Point>>& roadBorders,
+                const std::vector<Car*>& traffic);
+
+    // Desenha os raios do sensor (exemplo: saída no console).
+    void draw();
+
+    // Função de acesso ao número de raios.
+    int getRayCount() const { return rayCount; }
+
+    // Retorna as leituras (opcionais) dos raios.
+    std::vector<std::optional<Intersection>> getReadings() const { return readings; }
+
+private:
+    Car* car;
+    int rayCount;
+    double rayLength;
+    double raySpread;
+    std::vector<std::pair<Point, Point>> rays;
+    std::vector<std::optional<Intersection>> readings;
+
+    // Calcula a interseção de um dos raios com bordas/obstáculos.
+    std::optional<Intersection> getReading(const std::pair<Point, Point>& ray,
+                                             const std::vector<std::pair<Point, Point>>& roadBorders,
+                                             const std::vector<Car*>& traffic);
+
+    // Gera os raios com base na posição e ângulo do carro.
+    void castRays();
+};
+
+#endif // SENSOR_HPP
+
+=================================================================
+
+=== include/Util.hpp ===
+
+#ifndef UTILS_HPP
+#define UTILS_HPP
+
+#include <cmath>
+#include <vector>
+#include <SFML/Graphics.hpp>
+
+// Função linear de interpolação.
+inline float lerp(float A, float B, float t) {
+    return A + (B - A) * t;
+}
+
+// Estrutura para representar um ponto 2D.
+struct Point {
+    float x;
+    float y;
+    Point(float x = 0, float y = 0) : x(x), y(y) {}
+    sf::Vector2f toVector2f() const { return sf::Vector2f(x, y); }
+};
+
+// Estrutura para interseção entre dois segmentos de reta.
+struct Intersection {
+    float x;
+    float y;
+    float offset;
+};
+
+// Função que calcula a interseção entre as linhas AB e CD.
+Intersection* getIntersection(const Point& A, const Point& B, 
+                              const Point& C, const Point& D);
+
+// Verifica se dois polígonos se intersectam.
+bool polysIntersect(const std::vector<Point>& poly1, 
+                    const std::vector<Point>& poly2);
+
+// Estrutura para representar uma caixa delimitadora (Axis-Aligned Bounding Box).
+struct AABB {
+    float left, right, top, bottom;
+};
+
+// Verifica se dois AABBs se intersectam.
+bool aabbIntersect(const AABB& a, const AABB& b);
+
+#endif // UTILS_HPP
+
+=================================================================
+
+=== include/Visualizer.hpp ===
+
+#ifndef VISUALIZER_HPP
+#define VISUALIZER_HPP
+
+#include <SFML/Graphics.hpp>
+#include "NeuralNetwork.hpp"
+
+class Visualizer {
+public:
+    // Desenha a rede neural.
+    static void drawNetwork(sf::RenderTarget &target, NeuralNetwork* network);
+};
+
+#endif // VISUALIZER_HPP
+
+=================================================================
+
+=== src/Car.cpp ===
+
+#include "Car.hpp"
+#include "Sensor.hpp"         
+#include "NeuralNetwork.hpp"  
+#include "Controls.hpp"       
+#include "Util.hpp"
+#include <cmath>
+#include <iostream>
+#include <algorithm>
+
+Car::Car(double x, double y, double width, double height, const std::string& controlType, double maxSpeed)
+    : x(x), y(y), width(width), height(height), speed(0.0),
+      acceleration(0.2), maxSpeed(maxSpeed), friction(0.05),
+      angle(0.0), damaged(false), sensor(nullptr), brain(nullptr), controls(nullptr),
+      useBrain(false)  // Initialize to false
+{
+    // Fix: useBrain should be false for "KEYS" (manual control)
+    useBrain = (controlType != "KEYS");  // Reverse the condition
+
+    if (controlType != "DUMMY") {
+        sensor = new Sensor(this);
+        brain = new NeuralNetwork({ sensor->getRayCount(), 6, 4 });
+    }
+    controls = new Controls(controlType);
+}
+Car::~Car() {
+    delete sensor;
+    delete brain;
+    delete controls;
+}
+
+void Car::update(const std::vector<std::pair<Point, Point>>& roadBorders,
+                 const std::vector<Car*>& traffic)
+{
+    if (!damaged) {
+        move();
+        polygon = createPolygon();
+        damaged = assessDamage(roadBorders, traffic);
+    }
+
+    if (sensor) {
+        sensor->update(roadBorders, traffic);
+
+        // Prepara os dados a partir das leituras do sensor.
+        std::vector<double> offsets;
+        for (const auto& reading : sensor->getReadings()) {
+            if (reading.has_value())
+                offsets.push_back(1.0 - reading->offset);
+            else
+                offsets.push_back(0.0);
+        }
+
+        // Obtém a saída da rede neural.
+        std::vector<double> outputs = NeuralNetwork::feedForward(offsets, brain);
+
+        if (useBrain) {
+            controls->forward = outputs[0] > 0.5;
+            controls->left    = outputs[1] > 0.5;
+            controls->right   = outputs[2] > 0.5;
+            controls->reverse = outputs[3] > 0.5;
+        }
+    }
+}
+
+void Car::move() {
+    if (controls->forward)  speed += acceleration;
+    if (controls->reverse)  speed -= acceleration;
+
+    if (speed > maxSpeed)   speed = maxSpeed;
+    if (speed < -maxSpeed/2) speed = -maxSpeed/2;
+
+    if (speed > 0) speed -= friction;
+    if (speed < 0) speed += friction;
+    if (std::abs(speed) < friction) speed = 0;
+
+    if (speed != 0) {
+        int flip = speed > 0 ? 1 : -1;
+        if (controls->left)  angle += 0.03 * flip;
+        if (controls->right) angle -= 0.03 * flip;
+    }
+
+    x -= std::sin(angle) * speed;
+    y -= std::cos(angle) * speed;
+}
+
+
+std::vector<Point> Car::createPolygon() {
+    std::vector<Point> points;
+    double rad = std::hypot(width, height) / 2.0;
+    double alpha = std::atan2(width, height);
+
+    points.push_back({ static_cast<float>(x - std::sin(angle - alpha) * rad),
+                        static_cast<float>(y - std::cos(angle - alpha) * rad) });
+    points.push_back({ static_cast<float>(x - std::sin(angle + alpha) * rad),
+                        static_cast<float>(y - std::cos(angle + alpha) * rad) });
+    points.push_back({ static_cast<float>(x - std::sin(M_PI + angle - alpha) * rad),
+                        static_cast<float>(y - std::cos(M_PI + angle - alpha) * rad) });
+    points.push_back({ static_cast<float>(x - std::sin(M_PI + angle + alpha) * rad),
+                        static_cast<float>(y - std::cos(M_PI + angle + alpha) * rad) });
+    return points;
+}
+
+
+AABB Car::getAABB() const {
+    float minX = std::numeric_limits<float>::max();
+    float maxX = -std::numeric_limits<float>::max();
+    float minY = std::numeric_limits<float>::max();
+    float maxY = -std::numeric_limits<float>::max();
+
+    for (const auto& p : polygon) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+    }
+    return { minX, maxX, minY, maxY };
+}
+
+
+
+bool Car::assessDamage(const std::vector<std::pair<Point, Point>>& roadBorders,
+    const std::vector<Car*>& traffic)
+{
+// Verifica colisões com as bordas da estrada usando interseção por segmento.
+for (const auto& border : roadBorders) {
+    for (size_t i = 0; i < polygon.size(); ++i) {
+        Point p1 = polygon[i];
+        Point p2 = polygon[(i + 1) % polygon.size()];
+        if (getIntersection(p1, p2, border.first, border.second) != nullptr)
+            return true;
+        }
+    }// Verifica colisões com outros carros, utilizando somente a interseção dos polígonos.
+    for (const auto& otherCar : traffic) {
+        if (this == otherCar)
+            continue;
+        if (polysIntersect(polygon, otherCar->polygon))
+            return true;
+    }
+    return false;
+}
+
+
+=================================================================
+
+=== src/Controls.cpp ===
+
+#include "Controls.hpp"
+#include <SFML/Window/Keyboard.hpp>
+#include <SFML/Window/Event.hpp>
+#include <iostream>
+
+Controls::Controls(const std::string& controlType)
+    : forward(false), left(false), right(false), reverse(false)
+{
+    if (controlType == "KEYS") {
+        // Aqui definimos que usaremos as teclas padrão (setas do teclado)
+        std::cout << "Controles configurados com padrão KEYS (teclas de seta)" << std::endl;
+    } else {
+        std::cout << "Controles criados com o tipo: " << controlType << std::endl;
+    }
+}
+
+void Controls::setKeyPressed(sf::Keyboard::Key key) {
+    switch (key) {
+        case sf::Keyboard::Key::Up:
+            std::cout << "Key Pressed: Up" << std::endl;
+            forward = true;
+            break;
+        case sf::Keyboard::Key::Down:
+            std::cout << "Key Pressed: Down" << std::endl;
+            reverse = true;
+            break;
+        case sf::Keyboard::Key::Left:
+            std::cout << "Key Pressed: Left" << std::endl;
+            left = true;
+            break;
+        case sf::Keyboard::Key::Right:
+            std::cout << "Key Pressed: Right" << std::endl;
+            right = true;
+            break;
+        default:
+            break;
+    }
+}
+
+void Controls::setKeyReleased(sf::Keyboard::Key key) {
+    switch (key) {
+        case sf::Keyboard::Key::Up:
+            std::cout << "Key Released: Up" << std::endl;
+            forward = false;
+            break;
+        case sf::Keyboard::Key::Down:
+            std::cout << "Key Released: Down" << std::endl;
+            reverse = false;
+            break;
+        case sf::Keyboard::Key::Left:
+            std::cout << "Key Released: Left" << std::endl;
+            left = false;
+            break;
+        case sf::Keyboard::Key::Right:
+            std::cout << "Key Released: Right" << std::endl;
+            right = false;
+            break;
+        default:
+            break;
+    }
+}
+
+void Controls::update(const sf::Event& event) {
+    // Verifica se o evento é do tipo KeyPressed
+    if (event.is<sf::Event::KeyPressed>()) {
+        const sf::Event::KeyPressed* keyEvent = event.getIf<sf::Event::KeyPressed>();
+        if (keyEvent) {
+            setKeyPressed(keyEvent->code);
+        }
+    }
+    // Verifica se o evento é do tipo KeyReleased
+    else if (event.is<sf::Event::KeyReleased>()) {
+        const sf::Event::KeyReleased* keyEvent = event.getIf<sf::Event::KeyReleased>();
+        if (keyEvent) {
+            setKeyReleased(keyEvent->code);
+        }
+    }
+}
+
+=================================================================
+
+=== src/NeuralNetwork.cpp ===
+
+#include "NeuralNetwork.hpp"
+#include <cstdlib>
+#include <cmath>
+
+// Função auxiliar para gerar um número aleatório no intervalo [-1, 1].
+static double randomDouble() {
+    return static_cast<double>(rand()) / RAND_MAX * 2.0 - 1.0;
+}
+
+//////////////////////////////
+// Implementação da classe Level
+
+Level::Level(int inputCount, int outputCount)
+    : inputs(inputCount),
+      outputs(outputCount),
+      biases(outputCount),
+      weights(inputCount, std::vector<double>(outputCount))
+{
+    // Randomiza os pesos e vieses para o nível.
+    randomize(*this);
+}
+
+void Level::randomize(Level& level) {
+    // Randomiza os pesos de cada conexão.
+    for (size_t i = 0; i < level.inputs.size(); i++) {
+        for (size_t j = 0; j < level.outputs.size(); j++) {
+            level.weights[i][j] = randomDouble();
+        }
+    }
+    // Randomiza os vieses de cada saída.
+    for (size_t i = 0; i < level.biases.size(); i++) {
+        level.biases[i] = randomDouble();
+    }
+}
+
+std::vector<double> Level::feedForward(const std::vector<double>& givenInputs, Level& level) {
+    // Define as entradas do nível.
+    if (givenInputs.size() != level.inputs.size()) {
+        // Opcional: tratamento de erro pode ser adicionado.
+    }
+    level.inputs = givenInputs;
+
+    // Para cada saída, calcula a soma ponderada das entradas.
+    for (size_t i = 0; i < level.outputs.size(); i++) {
+        double sum = 0.0;
+        for (size_t j = 0; j < level.inputs.size(); j++) {
+            sum += level.inputs[j] * level.weights[j][i];
+        }
+        // Aplica a função de ativação: se a soma for maior que o viés, a saída é 1; caso contrário, 0.
+        level.outputs[i] = (sum > level.biases[i]) ? 1.0 : 0.0;
+    }
+
+    return level.outputs;
+}
+
+//////////////////////////////
+// Implementação da classe NeuralNetwork
+
+NeuralNetwork::NeuralNetwork(const std::vector<int>& neuronCounts) {
+    // Cria um nível para cada par de camadas consecutivas.
+    for (size_t i = 0; i < neuronCounts.size() - 1; i++) {
+        levels.emplace_back(neuronCounts[i], neuronCounts[i + 1]);
+    }
+}
+std::vector<double> NeuralNetwork::feedForward(const std::vector<double>& givenInputs, NeuralNetwork *network) {
+    std::vector<double> outputs = Level::feedForward(givenInputs, network->levels[0]); // Use -> instead of .
+    for (size_t i = 1; i < network->levels.size(); i++) { // Use -> instead of .
+        outputs = Level::feedForward(outputs, network->levels[i]); // Use -> instead of .
+    }
+    return outputs;
+}
+
+=================================================================
+
+=== src/Road.cpp ===
+
+#include <SFML/Graphics.hpp>
+#include <vector>
+#include <limits>
+#include <algorithm>
+#include <cmath>
+#include "Util.hpp"
+#include "Road.hpp"
+
+
+#include "Road.hpp"
+
+
+Road::Road(float x, float width, int laneCount)
+    : x(x), width(width), laneCount(laneCount)
+{
+    // Compute left/right based on the road center and width
+    left = x - width / 2.f;
+    right = x + width / 2.f;
+
+    // These values may depend on your simulation's coordinate system;
+    // here we use a very large number to simulate an "infinite" road vertically.
+    top = -MY_INFINITY;
+    bottom = MY_INFINITY;
+
+    // Define corner points
+    topLeft = Point(left, top);
+    topRight = Point(right, top);
+    bottomLeft = Point(left, bottom);
+    bottomRight = Point(right, bottom);
+
+    // Define borders as vertical lines at the left and right edges.
+    // Adjust this according to the collision detection you require.
+    borders.push_back({ Point(left, top), Point(left, bottom) });
+    borders.push_back({ Point(right, top), Point(right, bottom) });
+}
+
+
+float Road::getLaneCenter(int laneIndex) const {
+    float laneWidth = width / laneCount;
+    int index = std::min(laneIndex, laneCount - 1);
+    return left + laneWidth / 2 + index * laneWidth;
+}
+
+void Road::draw(sf::RenderWindow& window) const {
+    sf::Color white = sf::Color::White;
+    float dashLength = 20.f;
+    float gapLength = 20.f;
+    
+    // Desenha as linhas divisórias (pontilhadas) entre as faixas.
+    for (int i = 1; i <= laneCount - 1; i++) {
+        float xPos = lerp(left, right, static_cast<float>(i) / laneCount);
+        sf::Vector2f start(xPos, top);
+        sf::Vector2f end(xPos, bottom);
+        
+        // Calcula a direção e o comprimento total da linha.
+        sf::Vector2f direction = end - start;
+        float totalLength = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+        if (totalLength == 0) continue;
+        sf::Vector2f unitDir = direction / totalLength;
+        
+        float currentLength = 0.f;
+        // Enquanto não percorreu toda a linha, desenha traços e espaços.
+        while (currentLength < totalLength) {
+            float segmentLength = std::min(dashLength, totalLength - currentLength);
+            sf::Vector2f segStart = start + unitDir * currentLength;
+            sf::Vector2f segEnd = segStart + unitDir * segmentLength;
+            
+            // Desenha o traço atual.
+            sf::Vertex line[] = {
+                { segStart, white },
+                { segEnd, white }
+            };
+            window.draw(line, 2, sf::PrimitiveType::Lines);
+            
+            currentLength += dashLength + gapLength;
+        }
+    }
+    
+    // Desenha as bordas sólidas da estrada.
+    // Como cada borda é um std::pair<Point, Point>, usamos border.first e border.second.
+    for (const auto& border : borders) {
+        sf::Vector2f start(border.first.x, border.first.y);
+        sf::Vector2f end(border.second.x, border.second.y);
+        sf::Vertex line[] = {
+            { start, white },
+            { end, white }
+        };
+        window.draw(line, 2, sf::PrimitiveType::Lines);
+    }
+}
+
+=================================================================
+
+=== src/Sensor.cpp ===
+
+#include "Sensor.hpp"
+#include "Car.hpp"
+#include "Util.hpp"
+#include <algorithm>
+#include <iostream>
+
+Sensor::Sensor(Car* car)
+    : car(car), rayCount(5), rayLength(150), raySpread(M_PI / 2)
+{
+}
+
+
+void Sensor::castRays() {
+    rays.clear();
+    for (int i = 0; i < rayCount; ++i) {
+        double ratio = (rayCount == 1) ? 0.5 : static_cast<double>(i) / (rayCount - 1);
+        double rayAngle = lerp(static_cast<float>(raySpread / 2), static_cast<float>(-raySpread / 2), static_cast<float>(ratio)) + static_cast<float>(car->angle);
+        Point start = { static_cast<float>(car->x), static_cast<float>(car->y) };
+        Point end = { static_cast<float>(car->x - std::sin(rayAngle) * rayLength),
+                      static_cast<float>(car->y - std::cos(rayAngle) * rayLength) };
+        rays.push_back(std::make_pair(start, end));
+    }
+}
+
+void Sensor::update(const std::vector<std::pair<Point, Point>>& roadBorders,
+                    const std::vector<Car*>& traffic)
+{
+    castRays();
+    readings.clear();
+    for (const auto& ray : rays) {
+        readings.push_back(getReading(ray, roadBorders, traffic));
+    }
+}
+
+std::optional<Intersection> Sensor::getReading(const std::pair<Point, Point>& ray,
+                                                 const std::vector<std::pair<Point, Point>>& roadBorders,
+                                                 const std::vector<Car*>& traffic)
+{
+    std::vector<Intersection> touches;
+
+    // Verifica interseções com as bordas da estrada.
+    for (const auto& border : roadBorders) {
+        Intersection* touch = getIntersection(ray.first, ray.second, border.first, border.second);
+        if (touch != nullptr) {
+            touches.push_back(*touch);
+            delete touch;
+        }
+    }
+
+    // Verifica interseções com os carros.
+    for (const auto& otherCar : traffic) {
+        for (size_t j = 0; j < otherCar->polygon.size(); ++j) {
+            const Point& p3 = otherCar->polygon[j];
+            const Point& p4 = otherCar->polygon[(j + 1) % otherCar->polygon.size()];
+            Intersection* touch = getIntersection(ray.first, ray.second, p3, p4);
+            if (touch != nullptr) {
+                touches.push_back(*touch);
+                delete touch;
+            }
+        }
+    }
+
+    if (touches.empty())
+        return std::nullopt;
+    else {
+        auto minTouch = *std::min_element(touches.begin(), touches.end(),
+                           [](const Intersection& a, const Intersection& b) {
+                               return a.offset < b.offset;
+                           });
+        return minTouch;
+    }
+}
+
+void Sensor::draw() {
+    for (size_t i = 0; i < rays.size(); ++i) {
+        Point start = rays[i].first;
+        Point end = rays[i].second;
+        if (readings[i].has_value())
+            end = { readings[i]->x, readings[i]->y };
+
+        std::cout << "Raio " << i << ": Início(" << start.x << ", " << start.y 
+                  << ") -> Fim(" << end.x << ", " << end.y << ")\n";
+    }
+}
+
+=================================================================
+
+=== src/Util.cpp ===
+
+#include "Util.hpp"
+#include <limits>
+
+Intersection* getIntersection(const Point& A, const Point& B, 
+                              const Point& C, const Point& D)
+{
+    float tTop = (D.x - C.x) * (A.y - C.y) - (D.y - C.y) * (A.x - C.x);
+    float uTop = (C.y - A.y) * (A.x - B.x) - (C.x - A.x) * (A.y - B.y);
+    float bottom = (D.y - C.y) * (B.x - A.x) - (D.x - C.x) * (B.y - A.y);
+
+    if (std::fabs(bottom) < std::numeric_limits<float>::epsilon())
+        return nullptr;
+
+    float t = tTop / bottom;
+    float u = uTop / bottom;
+
+    if (t >= 0.f && t <= 1.f && u >= 0.f && u <= 1.f) {
+        auto* inter = new Intersection();
+        inter->x = lerp(A.x, B.x, t);
+        inter->y = lerp(A.y, B.y, t);
+        inter->offset = t;
+        return inter;
+    }
+    return nullptr;
+}
+
+bool polysIntersect(const std::vector<Point>& poly1, const std::vector<Point>& poly2)
+{
+    for (size_t i = 0; i < poly1.size(); i++) {
+        Point p1 = poly1[i];
+        Point p2 = poly1[(i + 1) % poly1.size()];
+        for (size_t j = 0; j < poly2.size(); j++) {
+            Point p3 = poly2[j];
+            Point p4 = poly2[(j + 1) % poly2.size()];
+            Intersection* touch = getIntersection(p1, p2, p3, p4);
+            if (touch) {
+                delete touch;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool aabbIntersect(const AABB& a, const AABB& b) {
+    return a.left < b.right && a.right > b.left &&
+           a.top < b.bottom && a.bottom > b.top;
+}
+
+=================================================================
+
+=== src/Visualizer.cpp ===
+
+#include "Visualizer.hpp"
+#include <cmath>
+
+// Define a função conforme declarada no header: recebe um sf::RenderTarget e um ponteiro para NeuralNetwork.
+void Visualizer::drawNetwork(sf::RenderTarget &target, NeuralNetwork* network) {
+    // Obtém o tamanho da área atual baseada na view
+    sf::Vector2f size = target.getView().getSize();
+    float width = size.x;
+    float height = size.y;
+
+    // Calcula o número de colunas (camadas) da rede neural.
+    // A camada de entrada mais cada nível da rede.
+    int numColumns = static_cast<int>(network->levels.size()) + 1;
+    float columnSpacing = width / (numColumns - 1);
+
+    // Armazena as posições dos neurônios para cada coluna.
+    std::vector<std::vector<sf::Vector2f>> neuronPositions(numColumns);
+
+    // Função lambda para calcular a posição de um neurônio na coluna 'col'
+    auto getNeuronPosition = [&](int col, int neuronIndex, int totalNeurons) -> sf::Vector2f {
+        float x = col * columnSpacing;
+        float ySpacing = height / (totalNeurons + 1);
+        float y = (neuronIndex + 1) * ySpacing;
+        return sf::Vector2f(x, y);
+    };
+
+    // Camada de entrada: assume que a quantidade de entradas é a de network->levels[0].inputs
+    int inputCount = static_cast<int>(network->levels[0].inputs.size());
+    neuronPositions[0].resize(inputCount);
+    for (int i = 0; i < inputCount; i++) {
+        neuronPositions[0][i] = getNeuronPosition(0, i, inputCount);
+    }
+
+    // Para cada nível, calcula as posições da camada de saída (ou seja, a próxima coluna).
+    for (size_t levelIndex = 0; levelIndex < network->levels.size(); levelIndex++) {
+        int neuronCount = static_cast<int>(network->levels[levelIndex].outputs.size());
+        neuronPositions[levelIndex + 1].resize(neuronCount);
+        for (int i = 0; i < neuronCount; i++) {
+            neuronPositions[levelIndex + 1][i] = getNeuronPosition(static_cast<int>(levelIndex + 1), i, neuronCount);
+        }
+    }
+
+    // Desenha as conexões (pesos) entre os neurônios de colunas consecutivas.
+    for (size_t l = 0; l < network->levels.size(); l++) {
+        const Level &level = network->levels[l];
+        int inCount = static_cast<int>(level.inputs.size());
+        int outCount = static_cast<int>(level.outputs.size());
+
+        for (int i = 0; i < inCount; i++) {
+            for (int j = 0; j < outCount; j++) {
+                float ix = neuronPositions[l][i].x;
+                float iy = neuronPositions[l][i].y;
+                float ox = neuronPositions[l+1][j].x;
+                float oy = neuronPositions[l+1][j].y;
+                float weight = level.weights[i][j];
+                // Usamos vermelho para peso não negativo e azul para peso negativo
+                sf::Color lineColor = (weight >= 0.f) ? sf::Color::Red : sf::Color::Blue;
+                sf::Vertex line[] = {
+                    { sf::Vector2f(ix, iy), lineColor },
+                    { sf::Vector2f(ox, oy), lineColor }
+                };
+                target.draw(line, 2, sf::PrimitiveType::Lines);
+            }
+        }
+
+        // Desenha os círculos representando os neurônios da camada de entrada para o nível atual.
+        for (int i = 0; i < inCount; i++) {
+            sf::CircleShape circle(5.f);
+            circle.setOrigin(sf::Vector2f(5.f, 5.f));
+            circle.setPosition(neuronPositions[l][i]);
+            circle.setFillColor(sf::Color::White);
+            circle.setOutlineColor(sf::Color::Black);
+            circle.setOutlineThickness(1);
+            target.draw(circle);
+        }
+
+        // Desenha os círculos para a camada de saída (próxima coluna).
+        for (int j = 0; j < outCount; j++) {
+            sf::CircleShape circle(5.f);
+            circle.setOrigin(sf::Vector2f(5.f, 5.f));
+            circle.setPosition(neuronPositions[l+1][j]);
+            circle.setFillColor(sf::Color::Green);
+            circle.setOutlineColor(sf::Color::Black);
+            circle.setOutlineThickness(1);
+            target.draw(circle);
+        }
+    }
+}
+
+=================================================================
+
+=== main.cpp ===
+
+#include <SFML/Graphics.hpp>
+#include <vector>
+#include <algorithm>
+#include "Road.hpp"
+#include "Car.hpp"
+#include "Visualizer.hpp"
+
+std::vector<Car*> generateCars(int N, const Road& road) {
+    std::vector<Car*> cars;
+    for (int i = 0; i < N; i++) {
+        cars.push_back(new Car(road.getLaneCenter(1), 100.0, 30, 50, "AI"));
+    }
+    return cars;
+}
+
+int main() {
+
+    
+    sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+    unsigned int windowWidth = static_cast<unsigned int>(desktop.size.x * 0.8);
+    unsigned int windowHeight = static_cast<unsigned int>(desktop.size.y * 0.8);
+
+    sf::RenderWindow window(sf::VideoMode({windowWidth, windowHeight}), "Self Driven Car - C++");
+    
+    // Define as porcentagens para as views de simulação e rede neural
+    float simViewWidth = windowWidth * 0.6f; // por exemplo, 60%
+    float netViewWidth = windowWidth - simViewWidth;
+    float viewHeight = static_cast<float>(windowHeight);
+    float simWidth = windowWidth * 0.6f;  // 60% da largura da janela para a simulação
+    float netWidth = windowWidth - simWidth; 
+    // Cria as views
+    sf::View simView(sf::FloatRect(sf::Vector2f(0.f, 0.f),sf::Vector2f(simViewWidth, viewHeight)));
+    sf::View netView(sf::FloatRect(sf::Vector2f(0.f, 0.f),sf::Vector2f(netViewWidth, viewHeight)));
+    
+    // Configura os viewports
+    simView.setViewport(sf::FloatRect(sf::Vector2f(0.f, 0.f),sf::Vector2f(simViewWidth / windowWidth, 1.f)));
+    netView.setViewport(sf::FloatRect(sf::Vector2f(simViewWidth / windowWidth, 0.f),sf::Vector2f(netViewWidth / windowWidth, 1.f)));
+
+
+    Road road(simWidth / 2.0f, simWidth * 0.9f, 3);
+
+    // std::vector<Car*> traffic;
+    // traffic.push_back(new Car(road.getLaneCenter(1), -100, 30, 50, "DUMMY", 2));
+    // traffic.push_back(new Car(road.getLaneCenter(0), -300, 30, 50, "DUMMY", 2));
+    // traffic.push_back(new Car(road.getLaneCenter(2), -300, 30, 50, "DUMMY", 2));
+    // traffic.push_back(new Car(road.getLaneCenter(0), -500, 30, 50, "DUMMY", 2));
+    // traffic.push_back(new Car(road.getLaneCenter(1), -500, 30, 50, "DUMMY", 2));
+    // traffic.push_back(new Car(road.getLaneCenter(1), -700, 30, 50, "DUMMY", 2));
+    // traffic.push_back(new Car(road.getLaneCenter(2), -700, 30, 50, "DUMMY", 2));
+
+    int N = 10;
+    // std::vector<Car*> cars = generateCars(N, road);
+    Car* carrim = new Car(road.getLaneCenter(1), 300, 50, 50, "KEYS");  // Correct controlType
+    while (window.isOpen()) {
+        while (const auto event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+                continue;
+            }
+
+            // Handle key presses
+            auto keyPressed = event->getIf<sf::Event::KeyPressed>();
+            if (keyPressed) {
+                // for (auto& tCar : traffic) {
+                //     tCar->controls->setKeyPressed(keyPressed->code);
+                // }
+                // for (auto& car : cars) {
+                //     car->controls->setKeyPressed(keyPressed->code);
+                // }
+                carrim->controls->setKeyPressed(keyPressed->code);
+            }
+
+            // Handle key releases
+            auto keyReleased = event->getIf<sf::Event::KeyReleased>();
+            if (keyReleased) {
+                // for (auto& tCar : traffic) {
+                //     tCar->controls->setKeyReleased(keyReleased->code);
+                // }
+                // for (auto& car : cars) {
+                //     car->controls->setKeyReleased(keyReleased->code);
+                // }
+                carrim->controls->setKeyReleased(keyReleased->code);
+            }
+        }
+    
+        // Update all cars, including carrim
+        const auto roadBorders = road.getBorders();
+        // for (auto& tCar : traffic) {
+        //     tCar->update(roadBorders, traffic);
+        // }
+        // for (auto& car : cars) {
+        //     car->update(roadBorders, traffic);
+        // }
+        carrim->update(roadBorders, {});
+
+        // Car* bestCar = cars[0];
+        // for (auto& car : cars) {
+        //     if (car->y < bestCar->y)
+        //         bestCar = car;
+        // }
+        simView.setCenter(sf::Vector2f(simWidth / 2.0f, carrim->y));
+
+        window.clear(sf::Color::Black);
+
+        window.setView(simView);
+        road.draw(window);
+        // for (auto& tCar : traffic)
+        //     tCar->draw(window);
+        // for (auto& car : cars) {
+        //     if (car != bestCar)
+        //         car->draw(window);
+        // }
+        carrim->draw(window);
+
+        window.setView(netView);
+        sf::RectangleShape netBg(sf::Vector2f(netWidth, windowHeight));
+        netBg.setFillColor(sf::Color(30, 30, 30));
+        window.draw(netBg);
+        Visualizer::drawNetwork(window, carrim->brain);
+
+        window.display();
+    }
+
+    // for (auto& car : cars)
+    //     delete car;
+    // for (auto& tCar : traffic)
+    //     delete tCar;
+
+    return 0;
+}
+=================================================================
+
+=== Estrutura de Diretórios ===
+
+.
+├── check_files.sh
+├── CMakeLists.txt
+├── include
+│   ├── Car.hpp
+│   ├── Controls.hpp
+│   ├── NeuralNetwork.hpp
+│   ├── Road.hpp
+│   ├── Sensor.hpp
+│   ├── Util.hpp
+│   └── Visualizer.hpp
+├── main.cpp
+├── project_files.txt
+├── resources
+├── src
+│   ├── Car.cpp
+│   ├── CMakeLists.txt
+│   ├── Controls.cpp
+│   ├── NeuralNetwork.cpp
+│   ├── Road.cpp
+│   ├── Sensor.cpp
+│   ├── Util.cpp
+│   └── Visualizer.cpp
+└── tests
+    └── CMakeLists.txt
+
+5 directories, 20 files

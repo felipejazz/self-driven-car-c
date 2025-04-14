@@ -1,3 +1,9 @@
+<<<<<<< HEAD
 build/**
 .vscode/**
 codes*
+=======
+.vscode/**
+**build/**
+check_files**
+>>>>>>> feat/v1Working
