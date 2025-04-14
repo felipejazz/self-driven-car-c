@@ -2,9 +2,9 @@
 #define NETWORK_HPP
 
 #include <vector>
-#include <cmath> // For std::tanh, std::exp if using different activation
+#include <cmath>
 #include <fstream>
-#include "Utils.hpp" // For lerp, getRandomSigned
+#include "Utils.hpp"
 
 // Represents one layer of the neural network
 class Level {
@@ -12,7 +12,7 @@ public:
     std::vector<float> inputs;
     std::vector<float> outputs;
     std::vector<float> biases;
-    std::vector<std::vector<float>> weights; // weights[input][output]
+    std::vector<std::vector<float>> weights;
 
     Level(int inputCount, int outputCount);
 

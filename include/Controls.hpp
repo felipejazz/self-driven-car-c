@@ -1,13 +1,12 @@
-// Controls.hpp
 #ifndef CONTROLS_HPP
 #define CONTROLS_HPP
 
 #include <SFML/Window/Keyboard.hpp>
 
 enum class ControlType {
-    KEYS,   // Manual keyboard control
-    DUMMY,  // Always moves forward
-    AI      // Controlled by neural network
+    KEYS,
+    DUMMY,
+    AI
 };
 
 class Controls {
@@ -19,9 +18,7 @@ public:
     ControlType type;
 
     Controls(ControlType t = ControlType::KEYS);
-
-    // Update controls based on keyboard input (only if type is KEYS)
     void update();
 };
 
-#endif // CONTROLS_HPP
+#endif

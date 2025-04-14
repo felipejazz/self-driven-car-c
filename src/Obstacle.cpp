@@ -2,20 +2,19 @@
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <cmath>
 #include <atomic>
-#include <iostream> // Added for potential error messages
+#include <iostream>
 
 std::atomic<long long> Obstacle::nextId(0);
 
 Obstacle::Obstacle(float x, float y, float w, float h, sf::Color col)
     : position(x, y), width(w), height(h), color(col),
       id(nextId.fetch_add(1, std::memory_order_relaxed)),
-      sprite(texture) // Initialize sprite with texture reference
+      sprite(texture)
 {
     updatePolygon();
-    loadTexture("assets/obstacle.png"); // Attempt to load obstacle sprite
+    loadTexture("assets/obstacle.png");
     if (!textureLoaded) {
-        // Optional: Add a warning if the texture fails to load
-        // std::cerr << "Warning: Failed to load obstacle texture (assets/obstacle.png)." << std::endl;
+        
     }
 }
 
@@ -33,11 +32,10 @@ void Obstacle::loadTexture(const std::string& filename) {
         sprite.setScale({width / textureRect.size.x, height / textureRect.size.y});
     } else {
         sprite.setScale({1.0f, 1.0f});
-        // Handle error case: texture loaded but has zero dimensions?
         return;
     }
     sprite.setOrigin({textureRect.size.x / 2.0f, textureRect.size.y / 2.0f});
-    sprite.setColor(color); // Apply the obstacle's color tint
+    sprite.setColor(color);
     textureLoaded = true;
 }
 
@@ -58,9 +56,6 @@ std::vector<sf::Vector2f> Obstacle::getPolygon() const {
 
 void Obstacle::draw(sf::RenderTarget& target) const {
     if (textureLoaded) {
-        // SFML Sprite's position and origin are already set relative to its center.
-        // Rotation is not needed for obstacles based on the original code.
-        // Create a mutable copy to set position for drawing
         sf::Sprite currentSprite = sprite;
         currentSprite.setPosition(position);
         target.draw(currentSprite);

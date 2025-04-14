@@ -5,15 +5,13 @@
 #include <vector>
 #include <optional>
 #include <random>
-#include <cstdint> // <--- Make sure this is included
+#include <cstdint>
 
-// Structure for intersection results
 struct IntersectionData {
     sf::Vector2f point;
-    float offset; // 't' value for the first segment (A, B)
+    float offset; 
 };
 
-// Function Declarations (Prototypes)
 float lerp(float a, float b, float t);
 float getRandom();
 float getRandomSigned();
@@ -26,5 +24,7 @@ bool polysIntersect(
 sf::Color hslToRgb(float h, float s, float l);
 sf::Color getValueColor(float value);
 sf::Color getRandomColor();
+float getRandomFloat(float min, float max);
+int getRandomInt(int min, int max);
 
 #endif // UTILS_HPP

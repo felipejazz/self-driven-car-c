@@ -10,14 +10,12 @@
 #include <algorithm>
 #include <filesystem>
 
-// Forward declarations
 class Car;
 class Obstacle;
 class Road;
 class NeuralNetwork;
-namespace sf { class Font; } // Não precisamos forward-declare Texture/Sprite
+namespace sf { class Font; }
 
-// Enumeração para os estados do jogo
 enum class GameState {
     MENU,
     SIMULATION,
@@ -32,31 +30,34 @@ public:
     void run();
 
 private:
-    // --- SFML & Window Members (Font e Texture declaradas PRIMEIRO) ---
+
     sf::RenderWindow window;
-    sf::Font font;                   // <<< DECLARADA ANTES de statusText e menuTexts
-    sf::Texture helpTexture;         // <<< DECLARADA ANTES de helpSprite
+    sf::Font font;
+    sf::Texture helpTexture;
+    sf::Texture menuBackgroundTexture;
     sf::View carView;
     sf::View networkView;
     sf::View statusView;
     Road road;
     sf::RectangleShape statusPanelBackground;
 
-    // --- Game State & Menu Members (Dependem de Font/Texture) ---
+    // --- Game State & Menu Members (Depend on Assets) ---
     GameState currentState;
     int selectedMenuItemIndex;
-    sf::Text statusText;             // <<< DECLARADA DEPOIS de font
-    std::vector<sf::Text> menuTexts; // <<< DECLARADA DEPOIS de font (será populada depois)
-    sf::Sprite helpSprite;           // <<< DECLARADA DEPOIS de helpTexture
+    sf::Text statusText;
+    std::vector<sf::Text> menuTexts;
+    sf::Sprite helpSprite;
+    sf::Sprite menuBackgroundSprite;
     bool helpTextureLoaded;
+    bool menuBackgroundTextureLoaded;
     const std::vector<std::string> menuItems = {
         "Iniciar Novo Treinamento",
-        // "Visualizar Rede Treinada",
+        "Visualizar Rede Treinada",
         "Ajuda"
     };
-    const sf::Color menuNormalColor = sf::Color(200, 200, 200);
+    const sf::Color menuNormalColor = sf::Color::Black;
     const sf::Color menuSelectedColor = sf::Color::Yellow;
-    const sf::Color menuTitleColor = sf::Color::White;
+    const sf::Color menuTitleColor = sf::Color::Black;
     const std::string VISUALIZE_BRAIN_FILENAME = "backups/bestBrain.dat";
     bool loadSpecificBrainOnStart;
 
@@ -86,9 +87,9 @@ private:
     const int NUM_AI_CARS = 1000;
     const int NUM_OBSTACLES = 30;
     const float START_Y_POSITION = 100.0f;
-    const float OBSTACLE_REMOVAL_DISTANCE = 500.0f;
+    const float OBSTACLE_REMOVAL_DISTANCE = 2000.0f;
     const float GENERATION_ZONE_START_Y = -550.0f;
-    const float GENERATION_ZONE_END_Y = -900.0f;
+    const float GENERATION_ZONE_END_Y = -2000.0f;
 
     // --- Private Helper Methods ---
     void setupWindowAndViews();
