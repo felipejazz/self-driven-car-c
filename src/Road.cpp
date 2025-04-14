@@ -5,6 +5,7 @@
 #include <SFML/Graphics/VertexArray.hpp>
 #include <SFML/Graphics/Color.hpp>
 #include <algorithm>
+#include <cmath>
 
 Road::Road(float centerX, float roadWidth, int lanes)
     : x(centerX), width(roadWidth), laneCount(lanes)
@@ -31,6 +32,16 @@ float Road::getLaneCenter(int laneIndex) const {
     return left + laneWidth / 2.0f + static_cast<float>(clampedIndex) * laneWidth;
 }
 
+int Road::getLaneIndex(float xPos){
+    int existingLaneIndex = -1;
+    if (this->laneCount > 0 && xPos >= this->left && xPos <= this->right) {
+        const float laneWidth = this->width / static_cast<float>(this->laneCount);
+        existingLaneIndex = static_cast<int>((xPos - this->left) / laneWidth);
+        existingLaneIndex = std::max(0, std::min(existingLaneIndex, this->laneCount - 1)); 
+        return existingLaneIndex;
+    }
+
+}
 void Road::draw(sf::RenderTarget& target) {
     if (laneCount > 1) {
         sf::VertexArray laneLines(sf::PrimitiveType::Lines);

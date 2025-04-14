@@ -22,28 +22,28 @@
 
 Game::Game()
     : road(0, 0),
-      // Inicializa font e textures PRIMEIRO
-      font(),
-      helpTexture(),
-      menuBackgroundTexture(), // <<< ADD: Initialize menu background texture
-      // AGORA inicializa statusText, sprites usando font/textures
-      statusText(font, "", 16),
-      helpSprite(helpTexture),
-      menuBackgroundSprite(menuBackgroundTexture), // <<< ADD: Initialize menu background sprite
-      // --- Inicializações restantes ---
-      currentState(GameState::MENU),
-      selectedMenuItemIndex(0),
-      helpTextureLoaded(false),
-      menuBackgroundTextureLoaded(false), // <<< ADD: Initialize menu background flag
-      loadSpecificBrainOnStart(false),
-      bestCarVisual(nullptr),
-      focusedCar(nullptr),
-      generationCount(1),
-      isPaused(false),
-      manualNavigationActive(false),
-      currentNavIndex(-1)
-      // window, views, background, clocks são inicializados por padrão
-      // vetores/unique_ptr são inicializados vazios/nullptr por padrão
+    // Inicializa font e textures PRIMEIRO
+    font(),
+    helpTexture(),
+    menuBackgroundTexture(), // <<< ADD: Initialize menu background texture
+    // AGORA inicializa statusText, sprites usando font/textures
+    statusText(font, "", 16),
+    helpSprite(helpTexture),
+    menuBackgroundSprite(menuBackgroundTexture), // <<< ADD: Initialize menu background sprite
+    // --- Inicializações restantes ---
+    currentState(GameState::MENU),
+    selectedMenuItemIndex(0),
+    helpTextureLoaded(false),
+    menuBackgroundTextureLoaded(false), // <<< ADD: Initialize menu background flag
+    loadSpecificBrainOnStart(false),
+    bestCarVisual(nullptr),
+    focusedCar(nullptr),
+    generationCount(1),
+    isPaused(false),
+    manualNavigationActive(false),
+    currentNavIndex(-1)
+    // window, views, background, clocks são inicializados por padrão
+    // vetores/unique_ptr são inicializados vazios/nullptr por padrão
 {
     std::cout << "Game constructor called." << std::endl;
     // Carrega Assets DEPOIS da lista de inicialização, mas ANTES de usá-los para configurar
@@ -68,49 +68,68 @@ Game::~Game() {
 // --- Configuration & Initialization ---
 
 void Game::setupWindowAndViews() {
-    std::cout << "Setting up window and views..." << std::endl;
+    std::cout << "Setting up window and views (using old proportions)..." << std::endl; // Log message updated
     sf::VideoMode desktopMode = sf::VideoMode::getDesktopMode();
-    const unsigned int screenWidth = std::max(1200u, static_cast<unsigned int>(desktopMode.size.x));
+    // Use a reasonable default size, but allow larger if desktop is bigger
+    const unsigned int screenWidth = std::max(1200u, static_cast<unsigned int>(desktopMode.size.x)); // Use full width for proportions
     const unsigned int screenHeight = std::max(800u, static_cast<unsigned int>(desktopMode.size.y));
 
-    const float totalOriginalWidth = 1200.0f;
-    const float statusPanelProportion = 250.0f / totalOriginalWidth;
-    const float carCanvasProportion = 200.0f / totalOriginalWidth;
-    const float networkCanvasProportion = 1.0f - statusPanelProportion - carCanvasProportion;
+    // <<< USE OLD PROPORTIONS based on a reference width >>>
+    const float totalOriginalWidth = 1200.0f; // Reference width from old version
+    const float statusPanelProportion = 250.0f / totalOriginalWidth;    // Old status panel proportion
+    const float carCanvasProportion = 200.0f / totalOriginalWidth;      // Old car canvas proportion
+    const float networkCanvasProportion = 1.0f - statusPanelProportion - carCanvasProportion; // Old network proportion
 
+    // <<< Calculate widths based on OLD proportions and CURRENT screen width >>>
     const float statusPanelWidthActual = screenWidth * statusPanelProportion;
     const float carCanvasWidthActual = screenWidth * carCanvasProportion;
     const float networkCanvasWidthActual = screenWidth * networkCanvasProportion;
 
-    window.create(sf::VideoMode({screenWidth, screenHeight}), "Self-Driving Car Simulation");
+    // Create Window (same as before)
+    window.create(sf::VideoMode({screenWidth, screenHeight}), "Self-Driving Car Simulation - V2");
     window.setFramerateLimit(60);
     std::cout << "Window created: " << screenWidth << "x" << screenHeight << std::endl;
 
-    // Configure road based on actual car canvas size
+    // Configure Road (uses OLDER carCanvasWidthActual * 0.9f)
     road = Road(carCanvasWidthActual / 2.0f, carCanvasWidthActual * 0.9f, 3);
-    std::cout << "Road configured." << std::endl;
+    std::cout << "Road configured with old width proportions." << std::endl;
 
-    // Configure Views
+    // --- Configure Views ---
+    // Status Text View (Top part of the left panel - uses OLD width proportion)
+    const float statusViewHeightRatio = 0.65f; // Keep the vertical split for graphs
+    statusView.setSize({statusPanelWidthActual, screenHeight * statusViewHeightRatio});
+    statusView.setCenter({statusPanelWidthActual / 2.0f, screenHeight * statusViewHeightRatio / 2.0f});
+    statusView.setViewport(sf::FloatRect({0.f, 0.f}, {statusPanelProportion, statusViewHeightRatio})); // Use OLD statusPanelProportion
+
+    // Graph View (Bottom part of the left panel - uses OLD width proportion)
+    const float graphViewHeightRatio = 1.0f - statusViewHeightRatio; // Keep vertical split
+    graphView.setSize({statusPanelWidthActual, screenHeight * graphViewHeightRatio});
+    graphView.setCenter({statusPanelWidthActual / 2.0f, screenHeight * graphViewHeightRatio / 2.0f});
+    graphView.setViewport(sf::FloatRect({0.f, statusViewHeightRatio}, {statusPanelProportion, graphViewHeightRatio})); // Use OLD statusPanelProportion
+
+    // Car Simulation View (Uses OLD width and position proportions)
     carView.setSize({carCanvasWidthActual, (float)screenHeight});
     carView.setCenter({carCanvasWidthActual / 2.0f, (float)screenHeight / 2.0f});
-    carView.setViewport(sf::FloatRect({statusPanelProportion, 0.f}, {carCanvasProportion, 1.f}));
+    carView.setViewport(sf::FloatRect({statusPanelProportion, 0.f}, {carCanvasProportion, 1.f})); // Use OLD proportions
 
+    // Network Visualization View (Uses OLD width and position proportions)
     networkView.setSize({networkCanvasWidthActual, (float)screenHeight});
     networkView.setCenter({networkCanvasWidthActual / 2.0f, (float)screenHeight / 2.0f});
-    networkView.setViewport(sf::FloatRect({statusPanelProportion + carCanvasProportion, 0.f}, {networkCanvasProportion, 1.f}));
+    networkView.setViewport(sf::FloatRect({statusPanelProportion + carCanvasProportion, 0.f}, {networkCanvasProportion, 1.f})); // Use OLD proportions
 
-    statusView.setSize({statusPanelWidthActual, (float)screenHeight});
-    statusView.setCenter({statusPanelWidthActual / 2.0f, (float)screenHeight / 2.0f});
-    statusView.setViewport(sf::FloatRect({0.f, 0.f}, {statusPanelProportion, 1.f}));
-    std::cout << "Views configured." << std::endl;
+    std::cout << "Views configured using old proportions (Status, Graph, Car, Network)." << std::endl;
 
-    // Configure Status Panel Background
-    statusPanelBackground.setSize({statusPanelWidthActual, (float)screenHeight});
+    // Configure Panel Backgrounds (Uses OLD statusPanelWidthActual)
+    statusPanelBackground.setSize({statusPanelWidthActual, screenHeight * statusViewHeightRatio});
     statusPanelBackground.setFillColor(sf::Color(40, 40, 40));
     statusPanelBackground.setPosition({0.f, 0.f});
-    std::cout << "Status panel background configured." << std::endl;
-}
 
+    graphPanelBackground.setSize({statusPanelWidthActual, screenHeight * graphViewHeightRatio});
+    graphPanelBackground.setFillColor(sf::Color(45, 45, 45));
+    graphPanelBackground.setPosition({0.f, screenHeight * statusViewHeightRatio});
+
+    std::cout << "Panel backgrounds configured with old widths." << std::endl;
+}
 // In src/Game.cpp
 
 // In src/Game.cpp
@@ -150,12 +169,12 @@ void Game::loadAssets() {
         // Check dimensions *after* confirming load success
         sf::Vector2u texSize = menuBackgroundTexture.getSize();
         if (texSize.x > 0 && texSize.y > 0) { // Ensure texture is valid
-             menuBackgroundSprite.setTexture(menuBackgroundTexture, true); // Link texture
-             menuBackgroundSprite.setOrigin({static_cast<float>(texSize.x) / 2.f, static_cast<float>(texSize.y) / 2.f});
-             std::cout << "Menu background sprite configured." << std::endl;
+            menuBackgroundSprite.setTexture(menuBackgroundTexture, true); // Link texture
+            menuBackgroundSprite.setOrigin({static_cast<float>(texSize.x) / 2.f, static_cast<float>(texSize.y) / 2.f});
+            std::cout << "Menu background sprite configured." << std::endl;
         } else {
-             std::cerr << ">>> Warning: Menu background texture loaded but has zero dimensions. Disabling background." << std::endl;
-             menuBackgroundTextureLoaded = false; // Treat as not loaded if dimensions are invalid
+            std::cerr << ">>> Warning: Menu background texture loaded but has zero dimensions. Disabling background." << std::endl;
+            menuBackgroundTextureLoaded = false; // Treat as not loaded if dimensions are invalid
         }
     }
     // --- END: Load Menu Background Texture ---
@@ -163,31 +182,31 @@ void Game::loadAssets() {
 
     // Carrega a Textura de Ajuda no membro 'helpTexture'
     // (Lógica de carregamento da textura de ajuda permanece a mesma)
-     std::cout << "Loading help texture..." << std::endl;
-     helpTextureLoaded = false; // Assume failure
-     if (!helpTexture.loadFromFile("assets/help.png")) {
-          if (!helpTexture.loadFromFile("../assets/help.png")) {
-             std::cerr << ">>> Warning: Could not load help texture 'assets/help.png' or '../assets/help.png'. Help screen disabled." << std::endl;
-          } else {
-               helpTextureLoaded = true; // Loaded from alternative path
-               std::cout << ">>> Successfully loaded help texture from: ../assets/help.png" << std::endl;
-          }
-     } else {
-          helpTextureLoaded = true; // Loaded from primary path
-          std::cout << ">>> Successfully loaded help texture from: assets/help.png" << std::endl;
-     }
+    std::cout << "Loading help texture..." << std::endl;
+    helpTextureLoaded = false; // Assume failure
+    if (!helpTexture.loadFromFile("assets/help.png")) {
+        if (!helpTexture.loadFromFile("../assets/help.png")) {
+            std::cerr << ">>> Warning: Could not load help texture 'assets/help.png' or '../assets/help.png'. Help screen disabled." << std::endl;
+        } else {
+            helpTextureLoaded = true; // Loaded from alternative path
+            std::cout << ">>> Successfully loaded help texture from: ../assets/help.png" << std::endl;
+        }
+    } else {
+        helpTextureLoaded = true; // Loaded from primary path
+        std::cout << ">>> Successfully loaded help texture from: assets/help.png" << std::endl;
+    }
 
-     if(helpTextureLoaded) {
-         sf::Vector2u texSize = helpTexture.getSize();
-         if (texSize.x > 0 && texSize.y > 0) {
-             helpSprite.setTexture(helpTexture, true);
-             helpSprite.setOrigin({static_cast<float>(texSize.x) / 2.f, static_cast<float>(texSize.y) / 2.f});
-             std::cout << "Help sprite configured." << std::endl;
-         } else {
-             std::cerr << ">>> Warning: Help texture loaded but has zero dimensions. Disabling help screen." << std::endl;
-             helpTextureLoaded = false;
-         }
-     }
+    if(helpTextureLoaded) {
+        sf::Vector2u texSize = helpTexture.getSize();
+        if (texSize.x > 0 && texSize.y > 0) {
+            helpSprite.setTexture(helpTexture, true);
+            helpSprite.setOrigin({static_cast<float>(texSize.x) / 2.f, static_cast<float>(texSize.y) / 2.f});
+            std::cout << "Help sprite configured." << std::endl;
+        } else {
+            std::cerr << ">>> Warning: Help texture loaded but has zero dimensions. Disabling help screen." << std::endl;
+            helpTextureLoaded = false;
+        }
+    }
 }
 
 // In src/Game.cpp
@@ -195,7 +214,7 @@ void Game::setupMenu() {
     std::cout << "Setting up menu..." << std::endl;
     if (font.getInfo().family.empty()) { // Font check remains
         std::cerr << "Error in setupMenu: Font not loaded. Cannot create menu text." << std::endl;
-         throw std::runtime_error("Font not loaded for menu setup");
+        throw std::runtime_error("Font not loaded for menu setup");
     }
 
     // --- MODIFICATION START ---
@@ -226,14 +245,14 @@ void Game::setupMenu() {
 
     // Highlight the selected item (This logic should work fine now)
     if (!menuTexts.empty()) {
-         // Make sure selectedMenuItemIndex is valid (it's initialized to 0)
-         if (selectedMenuItemIndex < 0 || selectedMenuItemIndex >= menuTexts.size()) {
-             selectedMenuItemIndex = 0;
-         }
-         menuTexts[selectedMenuItemIndex].setFillColor(menuSelectedColor);
-         menuTexts[selectedMenuItemIndex].setStyle(sf::Text::Bold);
+        // Make sure selectedMenuItemIndex is valid (it's initialized to 0)
+        if (selectedMenuItemIndex < 0 || selectedMenuItemIndex >= menuTexts.size()) {
+            selectedMenuItemIndex = 0;
+        }
+        menuTexts[selectedMenuItemIndex].setFillColor(menuSelectedColor);
+        menuTexts[selectedMenuItemIndex].setStyle(sf::Text::Bold);
     } else {
-         selectedMenuItemIndex = 0; // Reset if vector happens to be empty
+        selectedMenuItemIndex = 0; // Reset if vector happens to be empty
     }
 
 
@@ -256,6 +275,15 @@ void Game::initializeSimulation() {
     obstacles.clear();
     obstacleRawPtrs.clear();
 
+    // <<< NEW: Reset Graph Data and Mutation Rate >>>
+    averageFitnessHistory.clear();
+    bestFitnessHistory.clear();
+    mutationRateHistory.clear();
+    currentMutationRate = INITIAL_MUTATION_RATE; // Start with initial rate
+    // Add the initial rate to history so the graph starts at generation 1
+    updateGraphData(0.0f, 0.0f, currentMutationRate); // Add placeholder fitness for gen 0/1 start
+
+    // ... (rest of the function remains the same)
     // 1. Define Network Structure
     Car tempCar(0, 0, 30, 50, ControlType::AI); // Temp car to get sensor count
     int sensorRays = tempCar.getSensorRayCount();
@@ -302,9 +330,9 @@ void Game::initializeSimulation() {
         std::cout << "Attempting to load default brain for training: " << brainFileToLoad << std::endl;
         std::filesystem::path defaultBrainPath(brainFileToLoad);
 
-         if (!std::filesystem::exists(defaultBrainPath.parent_path()) && defaultBrainPath.has_parent_path()) {
-              std::cout << "Default brain directory '" << defaultBrainPath.parent_path().string() << "' not found. Starting training with random brain." << std::endl;
-         }
+        if (!std::filesystem::exists(defaultBrainPath.parent_path()) && defaultBrainPath.has_parent_path()) {
+            std::cout << "Default brain directory '" << defaultBrainPath.parent_path().string() << "' not found. Starting training with random brain." << std::endl;
+        }
         else if (bestBrainOfGeneration->loadFromFile(brainFileToLoad)) {
             std::cout << "Loaded default brain: " << brainFileToLoad << ". Resuming training." << std::endl;
             // Validation
@@ -328,9 +356,6 @@ void Game::initializeSimulation() {
     focusedCar = cars.empty() ? nullptr : cars[0].get();
     bestCarVisual = focusedCar;
     std::cout << "Initial focus set." << std::endl;
-
-    // 6. Reset Master Clock (if needed, maybe not)
-    // clock.restart();
 
     std::cout << "Simulation initialized successfully." << std::endl;
 }
@@ -406,19 +431,19 @@ void Game::processEvents() {
                         currentState = GameState::MENU;
                     }
                 }
-                 // Handle window resize for help screen? (Might need to recalculate sprite scale/pos)
-                 if (event.is<sf::Event::Resized>()) {
-                     // Example: Recalculate help sprite scale/position if needed
-                      if(helpTextureLoaded) {
-                           sf::Vector2u texSize = helpTexture.getSize();
-                           sf::Vector2u winSize = window.getSize();
-                           float scaleX = (float)winSize.x / texSize.x * 0.9f;
-                           float scaleY = (float)winSize.y / texSize.y * 0.9f;
-                           float scale = std::min({scaleX, scaleY, 1.0f});
-                           helpSprite.setScale({scale, scale});
-                           helpSprite.setPosition({winSize.x / 2.f, winSize.y / 2.f});
-                      }
-                 }
+                // Handle window resize for help screen? (Might need to recalculate sprite scale/pos)
+                if (event.is<sf::Event::Resized>()) {
+                    // Example: Recalculate help sprite scale/position if needed
+                    if(helpTextureLoaded) {
+                        sf::Vector2u texSize = helpTexture.getSize();
+                        sf::Vector2u winSize = window.getSize();
+                        float scaleX = (float)winSize.x / texSize.x * 0.9f;
+                        float scaleY = (float)winSize.y / texSize.y * 0.9f;
+                        float scale = std::min({scaleX, scaleY, 1.0f});
+                        helpSprite.setScale({scale, scale});
+                        helpSprite.setPosition({winSize.x / 2.f, winSize.y / 2.f});
+                    }
+                }
                 break;
         }
     }
@@ -534,91 +559,128 @@ void Game::updateMenu() {
 // In src/Game.cpp
 
 void Game::updateSimulation(sf::Time deltaTime) {
-    // --- Main Simulation Update Logic ---
-
-    int nonDamagedCount = 0;
-    bool anyCarMoved = false; // Track if any car is still moving forward
+    // ... (existing update logic for cars, obstacles, etc.) ...
 
     // 1. Update Cars
+    int nonDamagedCount = 0;
+    bool anyCarMoved = false;
+    float totalFitness = 0.0f; // <<< NEW: Accumulate fitness
+    float maxFitness = -std::numeric_limits<float>::infinity(); // <<< NEW: Track max fitness
+
     for (auto& carPtr : cars) {
         if (carPtr) {
             float yBefore = carPtr->position.y;
             carPtr->update(road, obstacleRawPtrs, deltaTime);
             if (!carPtr->isDamaged()) {
                 nonDamagedCount++;
-                if (carPtr->position.y < yBefore) { // Check if moved forward
+                if (carPtr->position.y < yBefore) {
                     anyCarMoved = true;
+                }
+                // <<< NEW: Update fitness tracking >>>
+                float currentCarFitness = carPtr->getFitness();
+                totalFitness += currentCarFitness;
+                if (currentCarFitness > maxFitness) {
+                    maxFitness = currentCarFitness;
+                    // bestCarFitness = carPtr.get(); // We already find best car later
+                }
+            } else { // Also add fitness of damaged cars if needed (e.g., for average)
+                totalFitness += carPtr->getFitness(); // Add fitness even if damaged now
+                if (carPtr->getFitness() > maxFitness) { // Update max even if damaged now
+                    maxFitness = carPtr->getFitness();
                 }
             }
         }
     }
 
-    // 2. Check for End of Generation
+    // 2. Check for End of Generation (conditions remain the same)
     bool allCarsDamaged = (nonDamagedCount == 0);
-    // Stall check: No cars damaged, but none moved forward, and some time passed
     bool generationStalled = (!allCarsDamaged && !anyCarMoved && generationClock.getElapsedTime().asSeconds() > 5.0f);
-    // *** NEW: Time limit check ***
     bool timeLimitExceeded = generationClock.getElapsedTime().asSeconds() > 60.0f;
 
-    // *** MODIFIED: Add timeLimitExceeded to the condition ***
     if ((allCarsDamaged || generationStalled || timeLimitExceeded) && !cars.empty()) {
         std::cout << "\n--- GENERATION " << generationCount << " ENDED ";
-        // *** MODIFIED: Add specific message for time limit ***
         if (timeLimitExceeded) std::cout << "(Time Limit Exceeded: >60s) ---" << std::endl;
         else if (generationStalled) std::cout << "(Stalled) ---" << std::endl;
-        else std::cout << "(All Damaged) ---" << std::endl; // Default reason if others aren't true
+        else std::cout << "(All Damaged) ---" << std::endl;
 
+        // --- Calculate and Store Graph Data ---
+        float averageFitness = cars.empty() ? 0.0f : totalFitness / static_cast<float>(cars.size());
+        // maxFitness is already calculated above
+        updateMutationRate(); // Calculate the rate for the *next* generation
+        updateGraphData(averageFitness, maxFitness, currentMutationRate);
+        std::cout << "Stats: Avg Fitness=" << averageFitness
+                << ", Best Fitness=" << maxFitness
+                << ", Next Mut Rate=" << currentMutationRate << std::endl;
+        // --- End Graph Data ---
+
+        // Find best car (logic remains the same)
         Car* carWithBestFitness = nullptr;
-        float maxFitness = -std::numeric_limits<float>::infinity();
-
-        // Find the best car of the generation (regardless of why generation ended)
-        // Prioritize non-damaged cars if any exist, otherwise take the best fitness overall
-        // (This part could be refined, but current logic finds absolute best fitness)
+        // Need to re-find the car associated with maxFitness
         for (const auto& carPtr : cars) {
-            if (carPtr) {
-                float currentCarFitness = carPtr->getFitness();
-                if (currentCarFitness > maxFitness) {
-                    maxFitness = currentCarFitness;
-                    carWithBestFitness = carPtr.get();
-                }
+            if (carPtr && carPtr->getFitness() >= maxFitness) { // Use >= to handle ties consistently
+                carWithBestFitness = carPtr.get();
+                // Don't break here, let it find the last one with max fitness if ties exist
             }
         }
 
-        // Process the best brain (same logic as before)
+        // Process best brain (logic remains the same)
         if (carWithBestFitness && carWithBestFitness->brain) {
-            *bestBrainOfGeneration = *(carWithBestFitness->brain); // Copy best brain
+            *bestBrainOfGeneration = *(carWithBestFitness->brain);
             std::cout << "Selected best brain (Fitness: " << maxFitness
-                      << ", Y: " << carWithBestFitness->position.y << ")" << std::endl;
-            if (!loadSpecificBrainOnStart) { // Save only if in training mode
+                    << ", Y: " << carWithBestFitness->position.y << ")" << std::endl;
+            if (!loadSpecificBrainOnStart) {
                 saveBestBrain();
             } else {
                 std::cout << "(Visualization mode: Not saving brain)" << std::endl;
             }
         } else {
-            // If no best car found (e.g., all cars invalid immediately) or it has no brain,
-            // keep the brain from the previous generation (bestBrainOfGeneration remains unchanged)
             std::cout << "No valid best car/brain found for this generation. Keeping previous best brain." << std::endl;
         }
 
-        // Prepare for the next round (same logic as before)
+        // Prepare next generation (logic remains the same)
         if (!loadSpecificBrainOnStart) {
-             std::cout << "--- Preparing Next Training Generation " << generationCount + 1 << " ---" << std::endl;
-         } else {
-              std::cout << "--- Resetting Visualization ---" << std::endl;
-         }
-        // Reset always uses the potentially updated bestBrainOfGeneration
-        resetGeneration(); // Reset cars, obstacles, apply brains
+            std::cout << "--- Preparing Next Training Generation " << generationCount + 1 << " ---" << std::endl;
+        } else {
+            std::cout << "--- Resetting Visualization ---" << std::endl;
+        }
+        resetGeneration();
 
-    } else if (!allCarsDamaged) { // Only manage obstacles if generation is still running
-        // 3. Manage Obstacles (Remove old, add new)
+    } else if (!allCarsDamaged) {
         manageInfiniteObstacles();
     }
 
-    // 4. Update Camera/NN Focus (same logic as before)
     updateFocus();
+    updateStatusPanel(); // Update status text *after* potential generation reset
+}
 
-    // 5. Update Status Panel Text (same logic as before)
-    updateStatusPanel();
+void Game::updateMutationRate() {
+    if (loadSpecificBrainOnStart) {
+        currentMutationRate = 0.0f; // No mutation in visualization mode
+        return;
+    }
+    // Exponential decay: rate approaches MIN as generationCount increases
+    currentMutationRate = MIN_MUTATION_RATE +
+                        (INITIAL_MUTATION_RATE - MIN_MUTATION_RATE) *
+                        std::exp(-MUTATION_DECAY_FACTOR * static_cast<float>(generationCount));
+
+    // Ensure it doesn't go below the minimum
+    currentMutationRate = std::max(MIN_MUTATION_RATE, currentMutationRate);
+}
+void Game::updateGraphData(float avgFit, float bestFit, float mutRate) {
+    averageFitnessHistory.push_back(avgFit);
+    bestFitnessHistory.push_back(bestFit);
+    mutationRateHistory.push_back(mutRate);
+
+    // Limit history size
+    while (averageFitnessHistory.size() > MAX_HISTORY_POINTS) {
+        averageFitnessHistory.pop_front();
+    }
+    while (bestFitnessHistory.size() > MAX_HISTORY_POINTS) {
+        bestFitnessHistory.pop_front();
+    }
+    while (mutationRateHistory.size() > MAX_HISTORY_POINTS) {
+        mutationRateHistory.pop_front();
+    }
 }
 // --- Render Methods ---
 
@@ -647,7 +709,7 @@ void Game::renderMenu() {
             std::cout << "Texture Size: (" << texSize.x << ", " << texSize.y << ")" << std::endl;
             std::cout << "Calculated Scale: " << scale << std::endl;
             std::cout << "Drawing BG Sprite - Pos: (" << menuBackgroundSprite.getPosition().x << ", " << menuBackgroundSprite.getPosition().y << ")"
-                      << " Scale: (" << menuBackgroundSprite.getScale().x << ", " << menuBackgroundSprite.getScale().y << ")" << std::endl;
+                    << " Scale: (" << menuBackgroundSprite.getScale().x << ", " << menuBackgroundSprite.getScale().y << ")" << std::endl;
             const sf::Color& spriteColor = menuBackgroundSprite.getColor();
             std::cout << "Drawing BG Sprite - Color: (" << (int)spriteColor.r << "," << (int)spriteColor.g << "," << (int)spriteColor.b << "," << (int)spriteColor.a << ")" << std::endl;
             const sf::IntRect& texRect = menuBackgroundSprite.getTextureRect();
@@ -658,26 +720,26 @@ void Game::renderMenu() {
             const sf::Texture* pTextureFromSprite = &(menuBackgroundSprite.getTexture());
 
             // Imprime os endereços para comparação visual (útil se a comparação direta falhar)
-             std::cout << "Drawing BG Sprite - Actual Texture Pointer Addr: " << static_cast<const void*>(pTextureFromSprite) << std::endl;
-             std::cout << "Drawing BG Sprite - Expected menuBackgroundTexture Addr: " << static_cast<const void*>(&menuBackgroundTexture) << std::endl;
+            std::cout << "Drawing BG Sprite - Actual Texture Pointer Addr: " << static_cast<const void*>(pTextureFromSprite) << std::endl;
+            std::cout << "Drawing BG Sprite - Expected menuBackgroundTexture Addr: " << static_cast<const void*>(&menuBackgroundTexture) << std::endl;
 
             // Verifica o ponteiro de forma idiomática
             if (pTextureFromSprite) { // Checa se não é nullptr
-                 if (pTextureFromSprite == &menuBackgroundTexture) { // Compara os ponteiros
-                     std::cout << "Drawing BG Sprite - Texture Pointer Check: OK (matches menuBackgroundTexture)" << std::endl;
-                 } else {
-                     std::cout << "Drawing BG Sprite - Texture Pointer Check: WARNING (Pointer exists, but doesn't match menuBackgroundTexture!)" << std::endl;
-                 }
-             } else {
-                 std::cout << "Drawing BG Sprite - Texture Pointer Check: ERROR (nullptr!)" << std::endl;
-             }
+                if (pTextureFromSprite == &menuBackgroundTexture) { // Compara os ponteiros
+                    std::cout << "Drawing BG Sprite - Texture Pointer Check: OK (matches menuBackgroundTexture)" << std::endl;
+                } else {
+                    std::cout << "Drawing BG Sprite - Texture Pointer Check: WARNING (Pointer exists, but doesn't match menuBackgroundTexture!)" << std::endl;
+                }
+            } else {
+                std::cout << "Drawing BG Sprite - Texture Pointer Check: ERROR (nullptr!)" << std::endl;
+            }
             std::cout << "--- END DEBUG renderMenu ---" << std::endl;
             // ***** FIM DEBUGGING *****
 
             window.draw(menuBackgroundSprite); // A chamada de desenho
 
         } else {
-             std::cout << "--- DEBUG renderMenu: Texture size is zero, skipping background draw. ---" << std::endl;
+            std::cout << "--- DEBUG renderMenu: Texture size is zero, skipping background draw. ---" << std::endl;
         }
     } else {
         std::cout << "--- DEBUG renderMenu: menuBackgroundTextureLoaded is false, skipping background draw. ---" << std::endl;
@@ -699,14 +761,14 @@ void Game::renderMenu() {
         window.draw(text);
     }
 
-     // Draw Basic Instructions (Existing code)
-     sf::Text instructionText(font, "Use UP/DOWN arrows and ENTER to select. ESC to exit.", 18);
-     instructionText.setFillColor(sf::Color(180, 180, 180));
-     sf::FloatRect instBounds = instructionText.getLocalBounds();
-      // Corrigido para usar left/top/width/height que são mais robustos que position/size para bounds
-     instructionText.setOrigin({instBounds.position.x + instBounds.size.x / 2.0f, instBounds.position.y + instBounds.size.y / 2.0f});
-     instructionText.setPosition({window.getSize().x / 2.0f, window.getSize().y * 0.9f});
-     window.draw(instructionText);
+    // Draw Basic Instructions (Existing code)
+    sf::Text instructionText(font, "Use UP/DOWN arrows and ENTER to select. ESC to exit.", 18);
+    instructionText.setFillColor(sf::Color(180, 180, 180));
+    sf::FloatRect instBounds = instructionText.getLocalBounds();
+    // Corrigido para usar left/top/width/height que são mais robustos que position/size para bounds
+    instructionText.setOrigin({instBounds.position.x + instBounds.size.x / 2.0f, instBounds.position.y + instBounds.size.y / 2.0f});
+    instructionText.setPosition({window.getSize().x / 2.0f, window.getSize().y * 0.9f});
+    window.draw(instructionText);
 }
 
 void Game::renderHelp() {
@@ -751,71 +813,67 @@ void Game::renderHelp() {
 }
 
 void Game::renderSimulation() {
-    // --- Render the Simulation State ---
-
-    // 1. Draw Status Panel
+    // 1. Draw Status Panel (Text)
     window.setView(statusView);
     window.draw(statusPanelBackground);
-    window.draw(statusText); // Updated in updateSimulation
+    window.draw(statusText);
 
-    // 2. Draw Car Simulation Area
-    // Update car view center (smoothly)
+    // <<< NEW: Draw Graphs Panel >>>
+    window.setView(graphView);       // Set the graph view
+    window.draw(graphPanelBackground); // Draw its background
+    renderGraphs();                  // Call the graph rendering function
+
+    // 2. Draw Car Simulation Area (remains the same)
+    // ... (update carView center) ...
     if (focusedCar) {
         float viewCenterX = carView.getSize().x / 2.0f;
-        float targetY = focusedCar->position.y - window.getSize().y * 0.3f; // Look ahead slightly
+        float targetY = focusedCar->position.y - window.getSize().y * 0.3f;
         float currentCenterY = carView.getCenter().y;
-        // Lerp for smooth camera movement (adjust factor 0.05 for speed)
         float newCenterY = lerp(currentCenterY, targetY, 0.05f);
         carView.setCenter({viewCenterX, newCenterY});
     } else {
-        // Fallback if no car is focused (e.g., all cars crashed in first frame)
         carView.setCenter({carView.getSize().x / 2.0f, START_Y_POSITION - window.getSize().y * 0.3f});
     }
-    window.setView(carView); // Apply the car view
-
-    // Draw road, obstacles, and cars
+    window.setView(carView);
+    // ... (draw road, obstacles, cars) ...
     road.draw(window);
     for (const auto& obsPtr : obstacles) { if (obsPtr) obsPtr->draw(window); }
-    // Draw non-focused cars first (no sensors)
     for (const auto& carPtr : cars) {
         if (carPtr && carPtr.get() != focusedCar) {
-            carPtr->draw(window, false); // false = don't draw sensor
+            carPtr->draw(window, false);
         }
     }
-    // Draw focused car last (with sensor)
     if (focusedCar) {
-        focusedCar->draw(window, true); // true = draw sensor
+        focusedCar->draw(window, true);
     }
 
-    // 3. Draw Neural Network Visualization
+
+    // 3. Draw Neural Network Visualization (remains the same)
     window.setView(networkView);
+    // ... (draw network background and network) ...
     sf::RectangleShape networkBackground(networkView.getSize());
     networkBackground.setFillColor(sf::Color(60, 60, 60));
     networkBackground.setPosition({0.f, 0.f});
     window.draw(networkBackground);
 
-    // Find the brain to draw (from the focused car)
     NeuralNetwork* brainToDraw = nullptr;
     if (focusedCar && focusedCar->useBrain && focusedCar->brain) {
         brainToDraw = &(*(focusedCar->brain));
     }
 
-    // Draw the network using the Visualizer class
     if (brainToDraw && !brainToDraw->levels.empty()) {
         Visualizer::drawNetwork(window, *brainToDraw, font,
-                                0.f, 0.f, // Draw relative to the network view's origin
+                                0.f, 0.f,
                                 networkView.getSize().x, networkView.getSize().y);
     } else {
-        // Display message if no brain is available for the focused car
         sf::Text noBrainText(font, "No brain to display", 20);
         noBrainText.setFillColor(sf::Color::White);
         sf::FloatRect textBounds = noBrainText.getLocalBounds();
         noBrainText.setOrigin({textBounds.position.x + textBounds.size.y / 2.0f, textBounds.position.y + textBounds.size.y / 2.0f});
-        noBrainText.setPosition({networkView.getSize().x / 2.0f, networkView.getSize().y / 2.0f}); // Center in network view
+        noBrainText.setPosition({networkView.getSize().x / 2.0f, networkView.getSize().y / 2.0f});
         window.draw(noBrainText);
     }
 }
-
 // --- Simulation Management Methods ---
 
 void Game::resetGeneration() {
@@ -855,42 +913,119 @@ void Game::resetGeneration() {
     std::cout << "--- Generation " << generationCount << (loadSpecificBrainOnStart ? " (Visualization)" : "") << " Ready --- \n" << std::endl;
 }
 
-void Game::saveBestBrain() {
-    if (loadSpecificBrainOnStart) {
-        std::cout << "(Save disabled in Visualization mode)" << std::endl;
-        return; // Don't save when just visualizing
+
+void Game::renderGraphs() {
+    sf::Vector2f viewSize = graphView.getSize();
+    float width = viewSize.x;
+    float height = viewSize.y;
+    float margin = 20.0f; // Margin around the graph drawing area
+    float graphWidth = width - 2 * margin;
+    float graphHeight = height - 2 * margin;
+    float graphLeft = margin;
+    float graphTop = margin;
+    float graphBottom = graphTop + graphHeight;
+    float graphRight = graphLeft + graphWidth;
+
+    size_t dataCount = averageFitnessHistory.size(); // Use one deque size as reference
+    if (dataCount < 2) return; // Need at least two points to draw a line
+
+    // --- Determine Data Ranges ---
+    float minFit = std::numeric_limits<float>::max();
+    float maxFit = -std::numeric_limits<float>::max();
+    float minMut = std::numeric_limits<float>::max();
+    float maxMut = -std::numeric_limits<float>::max();
+
+    // Use iterators for safe access within deque bounds
+    auto avgFitBegin = averageFitnessHistory.begin();
+    auto avgFitEnd = averageFitnessHistory.end();
+    auto bestFitBegin = bestFitnessHistory.begin();
+    auto bestFitEnd = bestFitnessHistory.end();
+    auto mutRateBegin = mutationRateHistory.begin();
+    auto mutRateEnd = mutationRateHistory.end();
+
+    for (auto it = bestFitBegin; it != bestFitEnd; ++it) {
+        minFit = std::min(minFit, *it);
+        maxFit = std::max(maxFit, *it);
+    }
+     for (auto it = avgFitBegin; it != avgFitEnd; ++it) {
+        minFit = std::min(minFit, *it);
+        // maxFit already potentially updated by bestFit
+    }
+     for (auto it = mutRateBegin; it != mutRateEnd; ++it) {
+        minMut = std::min(minMut, *it);
+        maxMut = std::max(maxMut, *it);
     }
 
-    if (bestBrainOfGeneration) {
-        std::filesystem::path filePath(DEFAULT_BRAIN_FILENAME);
-        std::filesystem::path dirPath = filePath.parent_path();
 
-        // Create directory if it doesn't exist
-        if (!dirPath.empty() && !std::filesystem::exists(dirPath)) {
-            try {
-                if (std::filesystem::create_directories(dirPath)) {
-                    std::cout << "Created directory: " << dirPath.string() << std::endl;
-                } else {
-                     std::cerr << "Warning: Failed to create directory (unknown reason): " << dirPath.string() << std::endl;
-                     // Continue trying to save anyway, might work if path is relative
-                }
-            } catch (const std::filesystem::filesystem_error& e) {
-                std::cerr << "Error creating directory '" << dirPath.string() << "': " << e.what() << std::endl;
-                return; // Stop if directory creation fails definitively
-            }
-        }
+    // Handle cases where data is constant or invalid
+    if (maxFit <= minFit) maxFit = minFit + 1.0f;
+    if (maxMut <= minMut) maxMut = minMut + 0.01f;
 
-        // Attempt to save the file
-        if (bestBrainOfGeneration->saveToFile(DEFAULT_BRAIN_FILENAME)) {
-            std::cout << "Saved Best Generation Brain to " << DEFAULT_BRAIN_FILENAME << std::endl;
-        } else {
-            std::cerr << "Error saving brain to " << DEFAULT_BRAIN_FILENAME << std::endl;
+    // --- Helper Lambda for Y Coordinate ---
+    auto getY = [&](float value, float minValue, float maxValue) {
+        if (maxValue == minValue) return graphBottom;
+        float normalized = (value - minValue) / (maxValue - minValue);
+        return graphBottom - normalized * graphHeight;
+    };
+
+    // --- Draw Axes ---
+    sf::VertexArray axes(sf::PrimitiveType::Lines);
+    axes.append({{graphLeft, graphTop}, sf::Color(100, 100, 100)});
+    axes.append({{graphRight, graphTop}, sf::Color(100, 100, 100)});
+    axes.append({{graphLeft, graphBottom}, sf::Color(100, 100, 100)});
+    axes.append({{graphRight, graphBottom}, sf::Color(100, 100, 100)});
+    axes.append({{graphLeft, graphTop}, sf::Color(100, 100, 100)});
+    axes.append({{graphLeft, graphBottom}, sf::Color(100, 100, 100)});
+    window.draw(axes);
+
+    // --- Draw Data Lines ---
+    sf::VertexArray avgFitLine(sf::PrimitiveType::LineStrip);
+    sf::VertexArray bestFitLine(sf::PrimitiveType::LineStrip);
+    sf::VertexArray mutRateLine(sf::PrimitiveType::LineStrip);
+
+    for (size_t i = 0; i < dataCount; ++i) {
+        float xPos = graphLeft + (static_cast<float>(i) / static_cast<float>(dataCount - 1)) * graphWidth;
+
+        if (i < averageFitnessHistory.size()) {
+            float yPosAvg = getY(averageFitnessHistory[i], minFit, maxFit);
+            avgFitLine.append({{xPos, yPosAvg}, sf::Color::Yellow});
         }
-    } else {
-        std::cerr << "No best brain available to save." << std::endl;
+        if (i < bestFitnessHistory.size()) {
+            float yPosBest = getY(bestFitnessHistory[i], minFit, maxFit);
+            bestFitLine.append({{xPos, yPosBest}, sf::Color::Cyan});
+        }
+        if (i < mutationRateHistory.size()) {
+            float yPosMut = getY(mutationRateHistory[i], minMut, maxMut);
+            mutRateLine.append({{xPos, yPosMut}, sf::Color::Magenta});
+        }
     }
+
+    if (avgFitLine.getVertexCount() > 0) window.draw(avgFitLine);
+    if (bestFitLine.getVertexCount() > 0) window.draw(bestFitLine);
+    if (mutRateLine.getVertexCount() > 0) window.draw(mutRateLine);
+
+    // --- NEW: Draw Legends ---
+    float legendX = graphRight + 5; // Position legends slightly to the right of the graph
+    float legendYStart = graphTop + 5;
+    float legendSpacing = 15.0f;
+    unsigned int legendCharSize = 10;
+
+    sf::Text avgFitLegend(font, "Avg Fitness", legendCharSize);
+    avgFitLegend.setFillColor(sf::Color::Yellow);
+    avgFitLegend.setPosition({graphLeft + 5, graphTop + 5}); // Position inside, top-left
+
+    sf::Text bestFitLegend(font, "Best Fitness", legendCharSize);
+    bestFitLegend.setFillColor(sf::Color::Cyan);
+    bestFitLegend.setPosition({graphLeft + 5, graphTop + 5 + legendSpacing}); // Below avg fit
+
+    sf::Text mutRateLegend(font, "Mutation Rate", legendCharSize);
+    mutRateLegend.setFillColor(sf::Color::Magenta);
+    mutRateLegend.setPosition({graphLeft + 5, graphTop + 5 + 2 * legendSpacing}); // Below best fit
+
+    window.draw(avgFitLegend);
+    window.draw(bestFitLegend);
+    window.draw(mutRateLegend);
 }
-
 void Game::discardSavedBrain() {
     std::cout << "Attempting to discard saved brain file(s)..." << std::endl;
     bool discardedDefault = false;
@@ -909,12 +1044,12 @@ void Game::discardSavedBrain() {
     }
 
     // Discard Visualization Brain
-     if (std::filesystem::exists(VISUALIZE_BRAIN_FILENAME)) {
+    if (std::filesystem::exists(VISUALIZE_BRAIN_FILENAME)) {
         if (std::remove(VISUALIZE_BRAIN_FILENAME.c_str()) == 0) {
             std::cout << "Discarded visualization brain file: " << VISUALIZE_BRAIN_FILENAME << std::endl;
             discardedVis = true;
         } else {
-             perror(("Error removing file: " + VISUALIZE_BRAIN_FILENAME).c_str());
+            perror(("Error removing file: " + VISUALIZE_BRAIN_FILENAME).c_str());
         }
     } else {
         std::cout << "Visualization brain file not found: " << VISUALIZE_BRAIN_FILENAME << std::endl;
@@ -922,12 +1057,12 @@ void Game::discardSavedBrain() {
 
     if (discardedDefault || discardedVis) {
         // Optional: Reset the in-memory brain if needed, e.g., if currently running sim
-         if (currentState == GameState::SIMULATION && bestBrainOfGeneration) {
+        if (currentState == GameState::SIMULATION && bestBrainOfGeneration) {
             std::cout << "Resetting current in-memory brain to random." << std::endl;
             bestBrainOfGeneration = std::make_unique<NeuralNetwork>(networkStructure);
-             // Re-apply this new random brain to the current generation
+            // Re-apply this new random brain to the current generation
             applyBrainsToGeneration(NUM_AI_CARS);
-         }
+        }
     }
 }
 
@@ -975,14 +1110,14 @@ void Game::startManualNavigation() {
         if (it != navigableCars.end()) {
             currentNavIndex = static_cast<int>(std::distance(navigableCars.begin(), it));
         } else {
-             focusedCar = navigableCars[currentNavIndex]; // Focus wasn't in list, set to rank 1
+            focusedCar = navigableCars[currentNavIndex]; // Focus wasn't in list, set to rank 1
         }
     } else {
         focusedCar = navigableCars[currentNavIndex]; // No focus before, set to rank 1
     }
 
     std::cout << "Manual Navigation ON. Cars available: " << navigableCars.size()
-              << ". Focused Rank: " << (currentNavIndex + 1) << std::endl;
+            << ". Focused Rank: " << (currentNavIndex + 1) << std::endl;
 }
 
 void Game::navigateManual(sf::Keyboard::Key key) {
@@ -1062,19 +1197,49 @@ void Game::generateInitialObstacles(int N, float minY, float maxY, float minW, f
 
     if (obstaclesPlaced < N) {
         std::cerr << "Warning: Only generated " << obstaclesPlaced << "/" << N
-                  << " initial obstacles due to spacing constraints or max attempts." << std::endl;
+                << " initial obstacles due to spacing constraints or max attempts." << std::endl;
     }
     std::cout << obstacles.size() << " initial obstacles placed." << std::endl;
 }
+void Game::saveBestBrain() {
+    if (loadSpecificBrainOnStart) {
+        std::cout << "(Save disabled in Visualization mode)" << std::endl;
+        return; // Don't save when just visualizing
+    }
 
+    if (bestBrainOfGeneration) {
+        std::filesystem::path filePath(DEFAULT_BRAIN_FILENAME);
+        std::filesystem::path dirPath = filePath.parent_path();
+
+        // Create directory if it doesn't exist
+        if (!dirPath.empty() && !std::filesystem::exists(dirPath)) {
+            try {
+                if (std::filesystem::create_directories(dirPath)) {
+                    std::cout << "Created directory: " << dirPath.string() << std::endl;
+                } else {
+                     std::cerr << "Warning: Failed to create directory (unknown reason): " << dirPath.string() << std::endl;
+                     // Continue trying to save anyway, might work if path is relative
+                }
+            } catch (const std::filesystem::filesystem_error& e) {
+                std::cerr << "Error creating directory '" << dirPath.string() << "': " << e.what() << std::endl;
+                return; // Stop if directory creation fails definitively
+            }
+        }
+
+        // Attempt to save the file
+        if (bestBrainOfGeneration->saveToFile(DEFAULT_BRAIN_FILENAME)) {
+            std::cout << "Saved Best Generation Brain to " << DEFAULT_BRAIN_FILENAME << std::endl;
+        } else {
+            std::cerr << "Error saving brain to " << DEFAULT_BRAIN_FILENAME << std::endl;
+        }
+    } else {
+        std::cerr << "No best brain available to save." << std::endl;
+    }
+}
 // Replace the existing Game::generateSingleObstacle function in src/Game.cpp with this:
 
 // Coloque esta função completa no seu arquivo src/Game.cpp
 // Certifique-se de que <limits>, <random> e "Utils.hpp" estão incluídos no topo do Game.cpp
-
-#include <limits>   // Necessário para std::numeric_limits
-#include <random>   // Necessário para std::mt19937 etc. (se usar localmente)
-#include "Utils.hpp" // Necessário para getRandomInt e getRandomFloat
 
 std::unique_ptr<Obstacle> Game::generateSingleObstacle(
     float minY, float maxY,
@@ -1133,10 +1298,10 @@ std::unique_ptr<Obstacle> Game::generateSingleObstacle(
             float minLaneDist = std::numeric_limits<float>::max();
             for (int l = 0; l < road.laneCount; ++l) {
                 float dist = std::abs(existingXPos - road.getLaneCenter(l));
-                 if (dist < (laneWidth / 2.0f) && dist < minLaneDist) { // Verifica se está mais perto que metade da largura da faixa
+                if (dist < (laneWidth / 2.0f) && dist < minLaneDist) { // Verifica se está mais perto que metade da largura da faixa
                     minLaneDist = dist;
                     existingLaneIndex = l;
-                 }
+                }
             }
 
             // Determina a folga vertical necessária
@@ -1149,7 +1314,7 @@ std::unique_ptr<Obstacle> Game::generateSingleObstacle(
 
             // Verifica sobreposição vertical (considerando a folga)
             bool verticalOverlapWithGap = (potentialTop - requiredVerticalGap < existingBottom) &&
-                                          (potentialBottom + requiredVerticalGap > existingTop);
+                                        (potentialBottom + requiredVerticalGap > existingTop);
 
             // Verifica sobreposição vertical direta (sem folga)
             bool directVerticalOverlap = potentialTop < existingBottom && potentialBottom > existingTop;
@@ -1184,24 +1349,24 @@ void Game::applyBrainsToGeneration(int N) {
     }
 
     if (loadSpecificBrainOnStart) {
-        // --- Visualization Mode: Apply the same brain to all ---
+        // --- Visualization Mode ---
         std::cout << "Applying visualized brain to all cars (no mutation)." << std::endl;
         for (int i = 0; i < cars.size(); ++i) {
             if (cars[i] && cars[i]->useBrain) {
-                // Ensure car has a brain instance, then copy contents
                 if (!cars[i]->brain) {
-                    cars[i]->brain.emplace(*bestBrainOfGeneration); // Create copy
+                    cars[i]->brain.emplace(*bestBrainOfGeneration);
                 } else {
-                    *(cars[i]->brain) = *bestBrainOfGeneration; // Overwrite with copy
+                    *(cars[i]->brain) = *bestBrainOfGeneration;
                 }
-                // Explicitly set mutation amount to 0 for visualization
+                // Ensure no mutation happens even if currentMutationRate wasn't 0
                 NeuralNetwork::mutate(*(cars[i]->brain), 0.0f);
             }
         }
     } else {
-        // --- Training Mode: Elitism + Mutation ---
-        std::cout << "Applying training brain (elite + mutations) to generation " << generationCount << "." << std::endl;
-        // Elite car (index 0) gets the best brain directly
+        // --- Training Mode ---
+        // <<< Use the calculated currentMutationRate >>>
+        std::cout << "Applying training brain (elite + mutations using rate " << currentMutationRate << ") to gen " << generationCount << "." << std::endl;
+
         if (cars[0] && cars[0]->useBrain) {
             if (!cars[0]->brain) {
                 cars[0]->brain.emplace(*bestBrainOfGeneration);
@@ -1212,69 +1377,69 @@ void Game::applyBrainsToGeneration(int N) {
             // NeuralNetwork::mutate(*(cars[0]->brain), 0.0f); // Already handled by copying
         }
 
-        // Other cars get a copy of the best brain + mutation
-        float mutationRate = 0.05f; // Adjust mutation rate as needed
+        // Other cars get mutation using the current rate
         for (int i = 1; i < cars.size(); ++i) {
             if (cars[i] && cars[i]->useBrain) {
                 if (!cars[i]->brain) {
                     cars[i]->brain.emplace(*bestBrainOfGeneration);
                 } else {
-                    *(cars[i]->brain) = *bestBrainOfGeneration; // Start with best brain copy
+                    *(cars[i]->brain) = *bestBrainOfGeneration;
                 }
-                // Apply mutation
-                NeuralNetwork::mutate(*(cars[i]->brain), mutationRate);
+                // <<< Use the member variable for mutation rate >>>
+                NeuralNetwork::mutate(*(cars[i]->brain), currentMutationRate);
             }
         }
     }
 }
 
 
+
 // --- Obstacle/Focus Management --- (Rest of the functions from previous answer)
 void Game::manageInfiniteObstacles() {
-     bestCarVisual = nullptr;
-     float minY_visual = std::numeric_limits<float>::max();
-     for (const auto& carPtr : cars) {
-         if (carPtr && !carPtr->isDamaged()) {
-             if (carPtr->position.y < minY_visual) {
-                 minY_visual = carPtr->position.y;
-                 bestCarVisual = carPtr.get();
-             }
-         }
-     }
+    bestCarVisual = nullptr;
+    float minY_visual = std::numeric_limits<float>::max();
+    for (const auto& carPtr : cars) {
+        if (carPtr && !carPtr->isDamaged()) {
+            if (carPtr->position.y < minY_visual) {
+                minY_visual = carPtr->position.y;
+                bestCarVisual = carPtr.get();
+            }
+        }
+    }
 
-     if (!bestCarVisual) return;
+    if (!bestCarVisual) return;
 
-     const float generationMinY = bestCarVisual->position.y + GENERATION_ZONE_END_Y;
-     const float generationMaxY = bestCarVisual->position.y + GENERATION_ZONE_START_Y;
-     const float removalY = bestCarVisual->position.y + OBSTACLE_REMOVAL_DISTANCE;
+    const float generationMinY = bestCarVisual->position.y + GENERATION_ZONE_END_Y;
+    const float generationMaxY = bestCarVisual->position.y + GENERATION_ZONE_START_Y;
+    const float removalY = bestCarVisual->position.y + OBSTACLE_REMOVAL_DISTANCE;
 
-      auto new_end = std::remove_if(obstacles.begin(), obstacles.end(),
-          [&](const std::unique_ptr<Obstacle>& obsPtr) {
-              if (!obsPtr) return true;
-              return obsPtr->position.y > removalY;
-          });
-     obstacles.erase(new_end, obstacles.end());
+    auto new_end = std::remove_if(obstacles.begin(), obstacles.end(),
+        [&](const std::unique_ptr<Obstacle>& obsPtr) {
+            if (!obsPtr) return true;
+            return obsPtr->position.y > removalY;
+        });
+    obstacles.erase(new_end, obstacles.end());
 
-     obstacleRawPtrs.clear();
-     obstacleRawPtrs.reserve(obstacles.size());
-     for (const auto& obsPtr : obstacles) {
-          if(obsPtr) obstacleRawPtrs.push_back(obsPtr.get());
-     }
+    obstacleRawPtrs.clear();
+    obstacleRawPtrs.reserve(obstacles.size());
+    for (const auto& obsPtr : obstacles) {
+        if(obsPtr) obstacleRawPtrs.push_back(obsPtr.get());
+    }
 
-     while (obstacles.size() < NUM_OBSTACLES) {
-          const float minW = 20.0f, maxW = 40.0f, minH = 40.0f, maxH = 80.0f;
-          const sf::Color obsColor = sf::Color(128, 128, 128);
-          const float minGapAdj = 75.0f, minGapSame = 150.0f;
+    while (obstacles.size() < NUM_OBSTACLES) {
+        const float minW = 20.0f, maxW = 40.0f, minH = 40.0f, maxH = 80.0f;
+        const sf::Color obsColor = sf::Color(128, 128, 128);
+        const float minGapAdj = 75.0f, minGapSame = 150.0f;
 
-          auto newObstacle = generateSingleObstacle(generationMinY, generationMaxY, minW, maxW, minH, maxH, obsColor, minGapAdj, minGapSame);
+        auto newObstacle = generateSingleObstacle(generationMinY, generationMaxY, minW, maxW, minH, maxH, obsColor, minGapAdj, minGapSame);
 
-          if (newObstacle) {
-             obstacleRawPtrs.push_back(newObstacle.get());
-             obstacles.push_back(std::move(newObstacle));
-          } else {
-             break;
-          }
-     }
+        if (newObstacle) {
+            obstacleRawPtrs.push_back(newObstacle.get());
+            obstacles.push_back(std::move(newObstacle));
+        } else {
+            break;
+        }
+    }
 }
 
 void Game::updateFocus() {
@@ -1329,39 +1494,39 @@ void Game::updateFocus() {
 
 
 void Game::updateStatusPanel() {
-     std::ostringstream statusStream;
-     statusStream << std::fixed << std::setprecision(1);
+    std::ostringstream statusStream;
+    statusStream << std::fixed << std::setprecision(1);
 
     // Display content based on current state
     switch (currentState) {
         case GameState::MENU:
-             statusStream << "State: MENU\n";
-             statusStream << "-------------\n";
-             statusStream << "Select an option using\n";
-             statusStream << "UP/DOWN arrows and ENTER.\n\n";
-             statusStream << "ESC to exit.";
+            statusStream << "State: MENU\n";
+            statusStream << "-------------\n";
+            statusStream << "Select an option using\n";
+            statusStream << "UP/DOWN arrows and ENTER.\n\n";
+            statusStream << "ESC to exit.";
             break;
 
         case GameState::HELP:
-             statusStream << "State: HELP\n";
-             statusStream << "-------------\n";
-             statusStream << "Displaying help image.\n\n";
-             statusStream << "Press ESC or ENTER\n";
-             statusStream << "to return to the menu.";
+            statusStream << "State: HELP\n";
+            statusStream << "-------------\n";
+            statusStream << "Displaying help image.\n\n";
+            statusStream << "Press ESC or ENTER\n";
+            statusStream << "to return to the menu.";
             break;
 
         case GameState::SIMULATION:
             { // Scope for simulation variables
-                 statusStream << "State: SIMULATION\n";
-                 statusStream << "Mode: " << (loadSpecificBrainOnStart ? "Visualization" : "Training") << "\n";
-                 statusStream << "-------------\n";
+                statusStream << "State: SIMULATION\n";
+                statusStream << "Mode: " << (loadSpecificBrainOnStart ? "Visualization" : "Training") << "\n";
+                statusStream << "-------------\n";
 
-                 int nonDamagedCount = 0;
-                 for (const auto& carPtr : cars) {
-                     if (carPtr && !carPtr->isDamaged()) {
-                         nonDamagedCount++;
-                     }
-                 }
+                int nonDamagedCount = 0;
+                for (const auto& carPtr : cars) {
+                    if (carPtr && !carPtr->isDamaged()) {
+                        nonDamagedCount++;
+                    }
+                }
 
                 statusStream << "Generation: " << generationCount << "\n";
                 statusStream << "Time: " << generationClock.getElapsedTime().asSeconds() << "s\n";
@@ -1370,37 +1535,37 @@ void Game::updateStatusPanel() {
                 statusStream << "Obstacles: " << obstacles.size() << "\n\n";
 
                 if (manualNavigationActive && !navigableCars.empty() && focusedCar) {
-                     int currentRank = -1;
-                      // Re-sort temporarily to get correct rank (can be optimized if list order is stable)
-                      std::sort(navigableCars.begin(), navigableCars.end(), [](const Car* a, const Car* b) {
-                          return a->position.y < b->position.y;
-                      });
-                      auto it = std::find(navigableCars.begin(), navigableCars.end(), focusedCar);
-                      if (it != navigableCars.end()) {
-                          currentRank = static_cast<int>(std::distance(navigableCars.begin(), it)) + 1;
-                      }
-                     statusStream << "Manual Nav: ON (Rank "
-                                  << (currentRank != -1 ? std::to_string(currentRank) : "?")
-                                  << "/" << navigableCars.size() << ")\n";
-                     statusStream << "Focus Y Pos: " << focusedCar->position.y << "\n";
-                     statusStream << "Focus Speed: " << focusedCar->getSpeed() << "\n";
-                      // statusStream << "Focus Fitness: " << focusedCar->getFitness() << "\n";
+                    int currentRank = -1;
+                    // Re-sort temporarily to get correct rank (can be optimized if list order is stable)
+                    std::sort(navigableCars.begin(), navigableCars.end(), [](const Car* a, const Car* b) {
+                        return a->position.y < b->position.y;
+                    });
+                    auto it = std::find(navigableCars.begin(), navigableCars.end(), focusedCar);
+                    if (it != navigableCars.end()) {
+                        currentRank = static_cast<int>(std::distance(navigableCars.begin(), it)) + 1;
+                    }
+                    statusStream << "Manual Nav: ON (Rank "
+                                << (currentRank != -1 ? std::to_string(currentRank) : "?")
+                                << "/" << navigableCars.size() << ")\n";
+                    statusStream << "Focus Y Pos: " << focusedCar->position.y << "\n";
+                    statusStream << "Focus Speed: " << focusedCar->getSpeed() << "\n";
+                    // statusStream << "Focus Fitness: " << focusedCar->getFitness() << "\n";
                 } else if (focusedCar){
-                     statusStream << "Manual Nav: OFF\n";
-                     statusStream << "Focus Y Pos: " << focusedCar->position.y << "\n";
-                     statusStream << "Focus Speed: " << focusedCar->getSpeed() << "\n";
-                      // statusStream << "Focus Fitness: " << focusedCar->getFitness() << "\n";
+                    statusStream << "Manual Nav: OFF\n";
+                    statusStream << "Focus Y Pos: " << focusedCar->position.y << "\n";
+                    statusStream << "Focus Speed: " << focusedCar->getSpeed() << "\n";
+                    // statusStream << "Focus Fitness: " << focusedCar->getFitness() << "\n";
                 } else {
-                     statusStream << "Manual Nav: OFF\nFocus: N/A\n";
+                    statusStream << "Manual Nav: OFF\nFocus: N/A\n";
                 }
 
-                 statusStream << "\n--- Controls ---\n";
-                 statusStream << " P: Pause | R: Reset Gen\n";
-                 statusStream << " N/B: Navigate Focus\n";
-                 statusStream << " Enter: Stop Navigate\n";
-                 statusStream << " Ctrl+S: Save Brain\n";
-                 statusStream << " D: Discard Brain(s)\n";
-                 statusStream << " ESC: Back to Menu";
+                statusStream << "\n--- Controls ---\n";
+                statusStream << " P: Pause | R: Reset Gen\n";
+                statusStream << " N/B: Navigate Focus\n";
+                statusStream << " Enter: Stop Navigate\n";
+                statusStream << " Ctrl+S: Save Brain\n";
+                statusStream << " D: Discard Brain(s)\n";
+                statusStream << " ESC: Back to Menu";
             }
             break; // End of SIMULATION case
     }

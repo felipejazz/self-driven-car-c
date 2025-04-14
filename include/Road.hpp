@@ -22,6 +22,7 @@ public:
     Road(float centerX, float roadWidth, int lanes = 3);
     float getLaneCenter(int laneIndex) const;
     void draw(sf::RenderTarget& target);
+    int getLaneIndex(float xPos);
 
 private:
     void setupBorders();
