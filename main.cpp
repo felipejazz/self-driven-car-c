@@ -13,8 +13,5 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    return EXIT_SUCCESS; // Termina normalmente
+    return EXIT_SUCCESS; 
 }
-
-// Remova as funções auxiliares (populateCarVector, generateObstacles, applyBrainsToGeneration, generateSingleObstacle)
-// que foram movidas para a classe Game.
