@@ -1,5 +1,3 @@
-// include/Car.hpp
-
 #ifndef CAR_HPP
 #define CAR_HPP
 
@@ -15,7 +13,8 @@
 #include <deque>
 #include <string>
 #include <unordered_set> // <-- Inclui para unordered_set
-#include <cstdint> // <-- Incluído para uint8_t
+#include <cstdint>       // <-- Incluído para uint8_t
+#include <cmath>         // Necessário para M_PI e outras funções matemáticas
 
 class Car {
 public:
@@ -63,14 +62,16 @@ private:
     float lastAppliedAcceleration = 0.0f;
     float stoppedTimer = 0.0f;
     float reversingTimer = 0.0f;
-    float previousYPosition = 0.0f;
-    float currentFitness = 0.0f;
-    // --- NOVOS/REUTILIZADOS para checagem de "preso" ---
     float stuckCheckTimer = 0.0f;
-    float stuckCheckStartY = 0.0f; // Posição Y no início da checagem de "preso"
+    float stuckCheckStartY = 0.0f;
 
+    // --- Variáveis de Estado Anteriores ---
+    float previousYPosition = 0.0f;
+    float previousAngle = 0.0f; // Para detectar giro
+    int previousLaneIndex = -1; // Para detectar mudança de faixa
 
-    // --- NOVO: Rastreamento de Ultrapassagem ---
+    // --- Membros de Lógica e Fitness ---
+    float currentFitness = 0.0f;
     std::unordered_set<long long> passedObstacleIDs; // IDs dos obstáculos ultrapassados
 
     // --- Métodos Auxiliares Privados ---
@@ -78,36 +79,37 @@ private:
     void move(float aiBrakeSignal, sf::Time deltaTime);
     void checkStoppedStatus(sf::Time deltaTime);
     void checkReversingStatus(sf::Time deltaTime);
-    void checkStuckStatus(sf::Time deltaTime); // <-- NOVA FUNÇÃO
-    // Adicionado para ultrapassagem
+    void checkStuckStatus(sf::Time deltaTime);
     void updateOvertakeStatus(const std::vector<Obstacle*>& obstacles);
-    // Modificado para retornar qual obstáculo foi atingido
     bool checkForCollision(const std::vector<std::pair<sf::Vector2f, sf::Vector2f>>& roadBorders,
                              const std::vector<Obstacle*>& obstacles,
-                             Obstacle*& hitObstacle); // Parâmetro de saída
-
+                             Obstacle*& hitObstacle);
     float calculateDesiredAcceleration(std::vector<float> outputs);
-    // --- Constantes de Comportamento Internas ---
-    static constexpr float STOPPED_SPEED_THRESHOLD = 0.05f;
-    static constexpr float STOPPED_TIME_THRESHOLD_SECONDS = 5.0f;
-    static constexpr float REVERSE_TIME_THRESHOLD_SECONDS = 2.0f;
-    // --- NOVAS constantes para checagem de "preso" ---
-    static constexpr float STUCK_DISTANCE_Y_THRESHOLD = 5.0f; // Distância mínima em Y para não ser considerado preso
-    static constexpr float STUCK_TIME_THRESHOLD_SECONDS = 1.5f; // Tempo para a checagem de "preso"
-    // static constexpr float BLOCKED_SPEED_THRESHOLD = 0.5f; // Relacionado a penalidade de bloqueio (não implementado ainda)
-    // static constexpr float BLOCKED_SENSOR_THRESHOLD = 0.8f; // Relacionado a penalidade de bloqueio (não implementado ainda)
+    int getCurrentLaneIndex(const Road& road) const;
 
     // --- Constantes de Fitness ---
+    static constexpr float FITNESS_SPINNING_PENALTY = 1.0f;       // Penalidade por girar no lugar
+    static constexpr float FITNESS_LANE_CHANGE_BONUS = 25.0f;      // Bônus por mudar de faixa (ajuste)
     static constexpr float FITNESS_SPEED_REWARD_THRESHOLD = 1.5f;
     static constexpr float FITNESS_FRAME_SURVIVAL_REWARD = 0.05f;
     static constexpr float FITNESS_SPEED_REWARD = 0.1f;
-    static constexpr float FITNESS_OVERTAKE_BONUS = 50.0f; // <-- RECOMPENSA POR ULTRAPASSAR
+    static constexpr float FITNESS_OVERTAKE_BONUS = 50.0f;
     static constexpr float FITNESS_STOPPED_PENALTY = 50.0f;
     static constexpr float FITNESS_REVERSING_PENALTY = 50.0f;
-    static constexpr float FITNESS_STUCK_PENALTY = 60.0f; // <-- PENALIDADE POR FICAR PRESO
-    static constexpr float FITNESS_FAIL_OVERTAKE_PENALTY = 75.0f; // <-- PENALIDADE POR COLIDIR ANTES DE PASSAR
-    // static constexpr float FITNESS_BLOCKED_PENALTY_PER_FRAME = 0.15f; // Relacionado a bloqueio (não implementado)
-    static constexpr float FITNESS_COLLISION_PENALTY = 100.0f; // Penalidade base por qualquer colisão
+    static constexpr float FITNESS_STUCK_PENALTY = 60.0f;
+    static constexpr float FITNESS_FAIL_OVERTAKE_PENALTY = 75.0f;
+    static constexpr float FITNESS_COLLISION_PENALTY = 100.0f;
+
+    // --- Constantes de Comportamento ---
+    // Limites para detecção de giro
+    static constexpr float SPINNING_ANGLE_THRESHOLD_RAD_PER_SEC = M_PI; // 180 graus/seg
+    static constexpr float SPINNING_MIN_Y_MOVEMENT_PER_SEC = 2.0f; // Menos de 2 unidades/seg para frente
+    // Outros limites
+    static constexpr float STOPPED_SPEED_THRESHOLD = 0.05f;
+    static constexpr float STOPPED_TIME_THRESHOLD_SECONDS = 5.0f;
+    static constexpr float REVERSE_TIME_THRESHOLD_SECONDS = 2.0f;
+    static constexpr float STUCK_DISTANCE_Y_THRESHOLD = 5.0f;
+    static constexpr float STUCK_TIME_THRESHOLD_SECONDS = 1.5f;
 };
 
 #endif // CAR_HPP

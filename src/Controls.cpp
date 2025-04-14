@@ -4,7 +4,7 @@ Controls::Controls(ControlType t) : type(t) {
     if (type == ControlType::DUMMY) {
         forward = true;
     }
-    // brake já é inicializado como false por padrão
+ 
 }
 
 void Controls::update() {
@@ -14,5 +14,5 @@ void Controls::update() {
         left = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A);
         right = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D);
     }
-    // Para AI e DUMMY, o estado é definido em outro lugar.
+
 }

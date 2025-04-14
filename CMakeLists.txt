@@ -32,6 +32,7 @@ set(SOURCES
     src/Utils.cpp
     src/Visualizer.cpp
     src/Obstacle.cpp
+    src/Game.cpp
 )
 add_executable(${EXECUTABLE_NAME} ${SOURCES})
 
