@@ -18,7 +18,7 @@
 
 class Car {
 public:
-    // --- Public Member ---
+
     sf::Vector2f position;
     float width;
     float height;
@@ -26,7 +26,6 @@ public:
     std::optional<NeuralNetwork> brain;
     bool useBrain = false;
 
-    // --- Constructor ---
     Car(float x, float y, float w, float h, ControlType type = ControlType::AI, float maxSpd = 3.0f, sf::Color col = sf::Color::Blue);
 
     void update(const Road& road, const std::vector<Obstacle*>& obstacles, sf::Time deltaTime);

@@ -6,10 +6,15 @@
 
 std::atomic<long long> Obstacle::nextId(0);
 
-Obstacle::Obstacle(float x, float y, float w, float h, sf::Color col)
+Obstacle::Obstacle(float x, float y, float w, float h,
+                   ObstacleType obsType,
+                   float initialSpeedY, 
+                   sf::Color col)       
     : position(x, y), width(w), height(h), color(col),
       id(nextId.fetch_add(1, std::memory_order_relaxed)),
-      sprite(texture)
+      sprite(texture),
+      type(obsType),  
+      speedY(initialSpeedY)
 {
     updatePolygon();
     loadTexture("assets/obstacle.png");

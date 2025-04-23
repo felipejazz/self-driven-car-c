@@ -242,7 +242,7 @@ int Car::getCurrentLaneIndex(const Road& road) const {
     }
     const float laneWidth = road.width / static_cast<float>(road.laneCount);
     int laneIndex = static_cast<int>((position.x - road.left) / laneWidth);
-    return std::max(0, std::min(laneIndex, road.laneCount - 1)); // Garante que está no intervalo [0, N-1]
+    return std::max(0, std::min(laneIndex, road.laneCount - 1));
 }
 
 
