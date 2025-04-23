@@ -460,6 +460,8 @@ void Game::handleMenuKeyPress(const sf::Event::KeyPressed& keyEvent) {
 
                 }
                 break;
+            case 3:
+                window.close();
         }
         return;
 

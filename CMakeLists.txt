@@ -59,6 +59,25 @@ else()
     message(WARNING "Assets directory not found at ${ASSETS_DIR}. Skipping asset copying.")
 endif()
 
+
+set(BACKUPS_DIR "${CMAKE_SOURCE_DIR}/backups")
+set(BACKUPS_DESTINATION "${CMAKE_BINARY_DIR}/backups") # Destination within the build folder
+
+if(EXISTS ${BACKUPS_DIR})
+    file(GLOB BACKUP_FILES "${BACKUPS_DIR}/*.*")
+    if(BACKUP_FILES) # Check if GLOB found any files
+        add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${BACKUPS_DESTINATION}
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${BACKUP_FILES} ${BACKUPS_DESTINATION}
+            COMMENT "Copying BACKUPS..."
+        )
+    else()
+        message(WARNING "BACKUPS directory exists at ${BACKUPS_DIR}, but no files matching '*.*' were found. Skipping asset copying.")
+    endif()
+else()
+    message(WARNING "BACKUPS directory not found at ${BACKUPS_DIR}. Skipping asset copying.")
+endif()
+
 # --- RPATH Section (Likely unnecessary for system-installed SFML) ---
 # If you remove this, the system linker will find SFML libs in /usr/lib.
 # If you keep it, it tells the executable to also look in its own directory for .so files.

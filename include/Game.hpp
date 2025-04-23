@@ -58,10 +58,10 @@ private:
     bool helpTextureLoaded;
     bool menuBackgroundTextureLoaded;
     const std::vector<std::string> menuItems = {
-        "Iniciar Novo Treinamento",
-        "Visualizar Rede Treinada",
-        "Ajuda",
-        "Sair" // Certifique-se que esta opção corresponde ao case 3 em handleMenuKeyPress
+        "Start new newtwork train",
+        "Visualize trained network ",
+        "Help",
+        "Exit"
     };
     const sf::Color menuNormalColor = sf::Color(200, 200, 200); // Normal menu item color
     const sf::Color menuSelectedColor = sf::Color::Yellow;      // Selected menu item color
