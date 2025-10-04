@@ -10,6 +10,7 @@ set(EXECUTABLE_NAME "self_driving_car")
 # Project include directory
 include_directories(include)
 
+set(SFML_STATIC_LIBRARIES ON)
 # Find SFML 3+ package and its components
 find_package(SFML 3 REQUIRED COMPONENTS Graphics Window System)
 

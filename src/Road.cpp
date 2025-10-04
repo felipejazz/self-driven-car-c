@@ -40,7 +40,7 @@ int Road::getLaneIndex(float xPos){
         existingLaneIndex = std::max(0, std::min(existingLaneIndex, this->laneCount - 1)); 
         return existingLaneIndex;
     }
-
+    return -1; // Return -1 if position is outside the road
 }
 void Road::draw(sf::RenderTarget& target) {
     if (laneCount > 1) {
