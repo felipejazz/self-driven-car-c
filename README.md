@@ -2,6 +2,8 @@
 
 This project is a C++ simulation of self-driving cars using a neural network for decision-making and SFML for graphics visualization. The simulation includes features like AI-controlled cars, obstacles, road rendering, neural network visualization, and a basic game structure with menus and pause functionality.
 
+https://github.com/user-attachments/assets/ebe48c31-46da-49cb-a405-14e20f5e95b2
+
 ## Features
 
 * **Car Simulation:** Simulates car physics including speed, acceleration, friction, and turning.
